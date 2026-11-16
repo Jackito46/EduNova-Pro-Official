@@ -172,11 +172,17 @@ export function subscribeOfflineSyncState(listener: SyncListener, schoolId?: str
 /** Détecte si une erreur Supabase est due à une coupure réseau / timeout plutôt qu'à un rejet métier */
 export function isTransientNetworkError(err: any): boolean {
   if (typeof navigator !== 'undefined' && !navigator.onLine) return true;
+  if (!err) return false;
+  const code = String(err?.code || '').toUpperCase();
+  const status = Number(err?.status || err?.statusCode || 0);
+  if (code === 'NETWORK_ERROR' || status === 503 || err?.name === 'AbortError') return true;
   const msg = String(err?.message || err || '').toLowerCase();
   return (
     msg.includes('failed to fetch') ||
+    msg.includes('erreur réseau') ||
     msg.includes('networkerror') ||
     msg.includes('network request failed') ||
+    msg.includes('service unavailable') ||
     msg.includes('load failed') ||
     msg.includes('timeout') ||
     msg.includes('aborted') ||

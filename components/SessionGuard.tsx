@@ -11,46 +11,79 @@ interface SessionGuardProps {
 }
 
 export const SessionGuard: React.FC<SessionGuardProps> = ({ user, children }) => {
-  const [hasSession, setHasSession] = useState<boolean | null>(null);
-  const [loading, setLoading] = useState(true);
+  const hasLocalSessionCache = (() => {
+    if (user.role === UserRole.SUPER_ADMIN) return true;
+    try {
+      if (!user.school_id) return false;
+      if (localStorage.getItem(`edunova_has_session_${user.school_id}`) === 'true') return true;
+      if (localStorage.getItem(`edunova_cached_active_year_${user.school_id}`)) return true;
+      if (localStorage.getItem(`edunova_cached_years_${user.school_id}`)) return true;
+    } catch {}
+    return false;
+  })();
+
+  const [hasSession, setHasSession] = useState<boolean | null>(() => {
+    if (hasLocalSessionCache) return true;
+    if (typeof navigator !== 'undefined' && !navigator.onLine) return true;
+    return null;
+  });
+  const [loading, setLoading] = useState(() => {
+    if (hasLocalSessionCache) return false;
+    if (typeof navigator !== 'undefined' && !navigator.onLine) return false;
+    return true;
+  });
   const [isCreating, setIsCreating] = useState(false);
   const [newSessionLabel, setNewSessionLabel] = useState('');
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (user.role === UserRole.SUPER_ADMIN) {
+    if (user.role === UserRole.SUPER_ADMIN || !user.school_id) {
       setHasSession(true);
       setLoading(false);
       return;
     }
 
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      setHasSession(true);
+      setLoading(false);
+      return;
+    }
+
+    let isMounted = true;
     const checkSession = async () => {
+      let timeoutId: ReturnType<typeof setTimeout> | undefined;
       try {
         const queryPromise = supabase
           .from('academic_years')
           .select('id')
           .eq('school_id', user.school_id)
           .limit(1);
-        
-        let timeoutId: NodeJS.Timeout;
-        const timeoutPromise = new Promise<any>((_, reject) => 
-          timeoutId = setTimeout(() => reject(new Error("Timeout")), 45000)
-        );
 
-        const { data, error } = await Promise.race([queryPromise, timeoutPromise]);
-        clearTimeout(timeoutId!);
+        const timeoutPromise = new Promise<never>((_, reject) => {
+          timeoutId = setTimeout(() => reject(new Error('SessionGuard timeout')), 3500);
+        });
+
+        const { data, error } = await Promise.race([Promise.resolve(queryPromise), timeoutPromise]);
+        if (timeoutId !== undefined) clearTimeout(timeoutId);
 
         if (error) throw error;
-        setHasSession(data && data.length > 0);
-      } catch (err) {
-        setHasSession(true); 
+        const exists = Boolean(data && data.length > 0);
+        if (exists) {
+          try { localStorage.setItem(`edunova_has_session_${user.school_id}`, 'true'); } catch {}
+        }
+        if (isMounted) setHasSession(exists);
+      } catch {
+        // Fail-open on network instability so UI never locks out or freezes
+        if (isMounted) setHasSession(true);
       } finally {
-        setLoading(false);
+        if (timeoutId !== undefined) clearTimeout(timeoutId);
+        if (isMounted) setLoading(false);
       }
     };
 
-    checkSession();
-  }, [user]);
+    void checkSession();
+    return () => { isMounted = false; };
+  }, [user?.id, user?.school_id, user?.role]);
 
   const handleCreateInitialSession = async (e: React.FormEvent) => {
     e.preventDefault();

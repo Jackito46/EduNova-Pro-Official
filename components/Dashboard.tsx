@@ -57,7 +57,7 @@ import {
 import { toast } from 'sonner';
 import { UserProfile, UserRole } from '../types';
 import { useSchool } from '../contexts/SchoolContext';
-import { supabase, isValidUuid } from '../supabase';
+import { supabase, isValidUuid, isNetworkOrTimeoutError, withTimeout } from '../supabase';
 import { geminiService } from '../services/geminiService';
 import { ConnectionRetryFallback as RetryableError } from './ConnectionRetryFallback';
 import { useOnlineStatus } from '../hooks/useOnlineStatus';
@@ -257,6 +257,10 @@ const Dashboard: React.FC<{ user: UserProfile }> = ({ user }) => {
 
   const { isOnline } = useOnlineStatus();
   const [error, setError] = useState<string | null>(null);
+  const [cacheMeta, setCacheMeta] = useState<{ isStale: boolean; updatedAt: number | null }>({
+    isStale: false,
+    updatedAt: null
+  });
 
   const [sidebarMode, setSidebarMode] = useState<'expanded' | 'collapsed' | 'hover'>(() => {
     if (typeof window !== 'undefined') {
@@ -380,36 +384,96 @@ const Dashboard: React.FC<{ user: UserProfile }> = ({ user }) => {
       return;
     }
 
-    const cacheKey = `edunova_dash_cache_${user.school_id}_${selectedYearId || 'default'}_${currentCampusId || 'all'}_${user.role}`;
-    let hasLoadedFromCache = false;
+    const cacheKey = `edunova_dash_cache_v2_${user.school_id}_${selectedYearId || 'default'}_${currentCampusId || 'all'}_${user.role}`;
+    const defaultCacheKey = `edunova_dash_cache_v2_${user.school_id}_default_${currentCampusId || 'all'}_${user.role}`;
+    const legacyCacheKey = `edunova_dash_cache_${user.school_id}_${selectedYearId || 'default'}_${currentCampusId || 'all'}_${user.role}`;
 
-    // Check fast cache first to render UI instantly (<50ms)
+    let hasLoadedFromCache = false;
+    let cachedTimestamp: number | null = null;
+
+    const applyCachedPayload = (parsed: any) => {
+      if (!parsed) return false;
+      let applied = false;
+      if (parsed.academicYears && Array.isArray(parsed.academicYears)) {
+        setAcademicYears(parsed.academicYears);
+      }
+      if (parsed.activeYearLabel) {
+        setSchoolInfo(prev => ({ ...prev, activeYearName: parsed.activeYearLabel }));
+      }
+      if (parsed.stats) {
+        setStats(parsed.stats);
+        applied = true;
+      }
+      if (parsed.directorStats) {
+        setDirectorStats(parsed.directorStats);
+        applied = true;
+      }
+      if (parsed.teacherStats) {
+        setTeacherStats(parsed.teacherStats);
+        applied = true;
+      }
+      if (parsed.studentStats) {
+        setStudentStats(parsed.studentStats);
+        applied = true;
+      }
+      if (parsed.currentStudent) setCurrentStudent(parsed.currentStudent);
+      if (parsed.studentCourses) setStudentCourses(parsed.studentCourses);
+      if (parsed.studentRecentGrades) setStudentRecentGrades(parsed.studentRecentGrades);
+      if (parsed.parentStats) {
+        setParentStats(parsed.parentStats);
+        applied = true;
+      }
+      if (parsed.chartData) setChartData(parsed.chartData);
+      if (parsed.classChartData) setClassChartData(parsed.classChartData);
+      if (parsed.fullClassRevenue) setFullClassRevenue(parsed.fullClassRevenue);
+      return applied;
+    };
+
+    // Hydrate immediately from persistent localStorage (<5ms), regardless of age when offline/unstable
     try {
-      const cachedStr = sessionStorage.getItem(cacheKey);
-      if (cachedStr) {
-        const parsed = JSON.parse(cachedStr);
-        if (parsed && parsed.stats && (Date.now() - (parsed.timestamp || 0) < 180000)) { // 3 min cache
-          setStats(parsed.stats);
-          if (parsed.directorStats) setDirectorStats(parsed.directorStats);
-          if (parsed.chartData) setChartData(parsed.chartData);
-          if (parsed.classChartData) setClassChartData(parsed.classChartData);
-          setLoading(false);
-          hasLoadedFromCache = true;
+      const candidateKeys = [cacheKey, defaultCacheKey, legacyCacheKey];
+      for (const k of candidateKeys) {
+        const cachedStr = localStorage.getItem(k) || sessionStorage.getItem(k);
+        if (cachedStr) {
+          const parsed = JSON.parse(cachedStr);
+          if (applyCachedPayload(parsed)) {
+            hasLoadedFromCache = true;
+            cachedTimestamp = parsed.timestamp || null;
+            setLoading(false);
+            break;
+          }
         }
       }
     } catch (e) {}
+
+    // Fail fast cleanly when offline so UI never freezes
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      if (hasLoadedFromCache) {
+        setError(null);
+        setCacheMeta({ isStale: true, updatedAt: cachedTimestamp });
+      } else {
+        setError("Mode hors-ligne actif : aucune donnée du tableau de bord n'a encore été mise en cache sur cet appareil.");
+      }
+      setLoading(false);
+      return;
+    }
 
     if (!hasLoadedFromCache) {
       setLoading(true);
     }
     setError(null);
+
     try {
-      // Étape 1 : Récupérer l'année active en premier (indispensable pour filtrer le reste)
-      const { data: allYears, error: yearsError } = await supabase
-        .from('academic_years')
-        .select('*')
-        .eq('school_id', user.school_id)
-        .order('label', { ascending: false });
+      // Étape 1 : Récupérer l'année active en premier avec délai borné
+      const { data: allYears, error: yearsError } = await withTimeout(
+        supabase
+          .from('academic_years')
+          .select('*')
+          .eq('school_id', user.school_id)
+          .order('label', { ascending: false }),
+        8000,
+        'Délai dépassé lors du chargement des années scolaires.'
+      );
 
       if (yearsError) throw yearsError;
 
@@ -456,19 +520,23 @@ const Dashboard: React.FC<{ user: UserProfile }> = ({ user }) => {
         suppliesQuery = suppliesQuery.eq('campus_id', activeCampusId);
       }
 
-      let [studentsRes, plansRes, paymentsRes, suppliesRes, staffRes, expensesRes, classesRes, enrollmentsRes, rateRes, assignmentsRes, catalogRes] = await Promise.all([
-        studentsQuery,
-        supabase.from('fee_plans').select('*').eq('school_id', user.school_id).eq('academic_year_id', activeYear.id),
-        paymentsQuery,
-        suppliesQuery,
-        staffQuery,
-        expensesQuery,
-        classesQuery,
-        enrollmentsQuery,
-        supabase.from('exchange_rates').select('*').eq('school_id', user.school_id).order('effective_date', { ascending: false }).limit(1),
-        assignmentsQuery,
-        catalogQuery
-      ]);
+      let [studentsRes, plansRes, paymentsRes, suppliesRes, staffRes, expensesRes, classesRes, enrollmentsRes, rateRes, assignmentsRes, catalogRes] = await withTimeout(
+        Promise.all([
+          studentsQuery,
+          supabase.from('fee_plans').select('*').eq('school_id', user.school_id).eq('academic_year_id', activeYear.id),
+          paymentsQuery,
+          suppliesQuery,
+          staffQuery,
+          expensesQuery,
+          classesQuery,
+          enrollmentsQuery,
+          supabase.from('exchange_rates').select('*').eq('school_id', user.school_id).order('effective_date', { ascending: false }).limit(1),
+          assignmentsQuery,
+          catalogQuery
+        ]),
+        12000,
+        'Délai dépassé lors de la synchronisation des indicateurs du tableau de bord.'
+      );
 
       // Detect low stock or out-of-stock items in supply catalog
       const catalogItems = catalogRes.data || [];
@@ -834,7 +902,7 @@ const Dashboard: React.FC<{ user: UserProfile }> = ({ user }) => {
       const uniqueBuyers = new Set(validSupplies.map(s => s.student_id).filter(Boolean));
       const economatPenetration = activeStudents.length > 0 ? (uniqueBuyers.size / activeStudents.length) * 100 : 0;
 
-      setStats({
+      const computedStats = {
         expected: totalExpected,
         expectedHTG: totalExpectedHTG,
         expectedUSD: totalExpectedUSD,
@@ -869,7 +937,18 @@ const Dashboard: React.FC<{ user: UserProfile }> = ({ user }) => {
         todayTotalAmountHTG,
         todayTotalAmountUSD,
         economatPenetration
-      });
+      };
+      setStats(computedStats);
+
+      let computedDirectorStats: any = null;
+      let computedTeacherStats: any = null;
+      let computedStudentStats: any = null;
+      let computedStudentObj: any = null;
+      let computedStudentCourses: any[] = [];
+      let computedStudentGrades: any[] = [];
+      let computedParentStats: any = null;
+      let computedClassChartData: any[] = [];
+      let computedFullClassRevenue: any[] = [];
 
       // Role-specific data fetching
       if (user.role === UserRole.TEACHER) {
@@ -952,14 +1031,15 @@ const Dashboard: React.FC<{ user: UserProfile }> = ({ user }) => {
           const days = ['Dimanche', 'Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi'];
           const currentDay = days[new Date().getDay()];
           
-          setTeacherStats({
+          computedTeacherStats = {
             classesCount: uniqueClasses.length,
             studentsCount: totalStudentsForTeacher,
             todayHours: assignments?.filter(a => a.day_of_week === currentDay).reduce((acc, a) => acc + Number(a.duration_hours), 0) || 0,
             assignments: assignments || [],
             syllabusSubjects,
             totalEvaluations
-          });
+          };
+          setTeacherStats(computedTeacherStats);
         }
       } else if (user.role === UserRole.STUDENT) {
         // Try to find student by parent_email or full name
@@ -1236,7 +1316,10 @@ const Dashboard: React.FC<{ user: UserProfile }> = ({ user }) => {
             ? Math.max(0, totalCredits - totalDebits)
             : Number(studentData.wallet_balance_htg || 0);
 
-          setStudentStats({
+          computedStudentObj = studentData;
+          computedStudentCourses = classSubjectsList;
+          computedStudentGrades = detailedGrades;
+          computedStudentStats = {
             className: studentData.class?.name || 'Non assigné',
             attendanceRate: 85,
             averageGrade: Number(avg.toFixed(2)),
@@ -1260,7 +1343,8 @@ const Dashboard: React.FC<{ user: UserProfile }> = ({ user }) => {
             hasCampaigns: activeCampaignFees.length > 0 || campTotalExpected > 0,
             wallet_balance_htg: certifiedWalletHTG,
             wallet_balance_usd: Number(studentData.wallet_balance_usd || 0)
-          });
+          };
+          setStudentStats(computedStudentStats);
         }
       } else if (user.role === UserRole.PARENT) {
         const userSchoolId = user.school_id || school?.id;
@@ -1422,21 +1506,23 @@ const Dashboard: React.FC<{ user: UserProfile }> = ({ user }) => {
             };
           });
 
-          setParentStats({
+          computedParentStats = {
             childrenCount: enrichedChildren.length,
             totalPaid,
             totalDue,
             children: enrichedChildren,
             payments: enrichedPayments
-          });
+          };
+          setParentStats(computedParentStats);
         } else {
-          setParentStats({
+          computedParentStats = {
             childrenCount: 0,
             totalPaid: 0,
             totalDue: 0,
             children: [],
             payments: []
-          });
+          };
+          setParentStats(computedParentStats);
         }
       }
 
@@ -1503,13 +1589,14 @@ const Dashboard: React.FC<{ user: UserProfile }> = ({ user }) => {
           campusAttendance = campusAttendance.filter(a => activeStaffIds.has(a.staff_id));
         }
 
-        setDirectorStats({
+        computedDirectorStats = {
           presentStaff: campusAttendance?.filter(a => a.status === 'Présent').length || 0,
           absentStaff: campusAttendance?.filter(a => a.status === 'Absent').length || 0,
           lateStaff: campusAttendance?.filter(a => a.status === 'Retard').length || 0,
           attendanceDate: effectiveDate,
           recentPayments: recentPayments
-        });
+        };
+        setDirectorStats(computedDirectorStats);
       }
 
       // Étape 4 : Préparation des données du graphique (Optimisée)
@@ -1557,45 +1644,76 @@ const Dashboard: React.FC<{ user: UserProfile }> = ({ user }) => {
           .map(([name, amount]) => ({ name, montant: amount }))
           .sort((a, b) => b.montant - a.montant);
 
-        setFullClassRevenue(classDataArray);
-        setClassChartData(classDataArray.slice(0, 10)); // Top 10 for chart
-
-        // Save to sessionStorage cache for instant loading on subsequent visits
-        try {
-          sessionStorage.setItem(cacheKey, JSON.stringify({
-            stats,
-            directorStats,
-            chartData: monthlyData,
-            classChartData: classDataArray.slice(0, 10),
-            timestamp: Date.now()
-          }));
-        } catch (e) {}
+        computedFullClassRevenue = classDataArray;
+        computedClassChartData = classDataArray.slice(0, 10);
+        setFullClassRevenue(computedFullClassRevenue);
+        setClassChartData(computedClassChartData); // Top 10 for chart
       }
 
-    } catch (err: any) {
-      const isNetworkError = 
-        err?.code === 'NETWORK_ERROR' || 
-        err?.message?.includes('Erreur réseau') || 
-        err?.message?.includes('Failed to fetch') ||
-        err?.message === 'Failed to fetch';
+      // Persist complete fresh payload across ALL roles in localStorage for offline/unstable fallback
+      const nowTs = Date.now();
+      const persistentPayload = {
+        academicYears: allYears || undefined,
+        activeYearLabel: activeYear.label,
+        stats: computedStats,
+        directorStats: computedDirectorStats,
+        teacherStats: computedTeacherStats,
+        studentStats: computedStudentStats,
+        currentStudent: computedStudentObj,
+        studentCourses: computedStudentCourses.length > 0 ? computedStudentCourses : undefined,
+        studentRecentGrades: computedStudentGrades.length > 0 ? computedStudentGrades : undefined,
+        parentStats: computedParentStats,
+        chartData: monthlyData,
+        classChartData: computedClassChartData,
+        fullClassRevenue: computedFullClassRevenue,
+        timestamp: nowTs
+      };
 
-      if (isNetworkError) {
-        console.warn("Dashboard Stats: Avertissement réseau (utilisation du cache si disponible):", err?.message || err);
-        // Attempt fallback from sessionStorage cache
-        try {
-          const cacheKey = `edunova_dash_stats_${user.school_id}_${currentCampusId || 'GLOBAL'}_${selectedYearId || 'ACTIVE'}`;
-          const cached = sessionStorage.getItem(cacheKey);
-          if (cached) {
-            const parsed = JSON.parse(cached);
-            if (parsed.stats) setStats(parsed.stats);
-            if (parsed.directorStats) setDirectorStats(parsed.directorStats);
-            if (parsed.chartData) setChartData(parsed.chartData);
-            if (parsed.classChartData) setClassChartData(parsed.classChartData);
+      try {
+        const serialized = JSON.stringify(persistentPayload);
+        localStorage.setItem(cacheKey, serialized);
+        localStorage.setItem(defaultCacheKey, serialized);
+        localStorage.setItem(`edunova_dash_cache_v2_${user.school_id}_${activeYear.id}_${currentCampusId || 'all'}_${user.role}`, serialized);
+        sessionStorage.setItem(legacyCacheKey, serialized);
+      } catch (e) {}
+
+      setCacheMeta({ isStale: false, updatedAt: nowTs });
+      setError(null);
+
+    } catch (err: any) {
+      const networkIssue = isNetworkOrTimeoutError(err) || (typeof navigator !== 'undefined' && !navigator.onLine);
+
+      if (networkIssue) {
+        console.warn("Dashboard Stats: Connexion instable/hors-ligne (bascule sur cache local):", err?.message || err);
+        if (hasLoadedFromCache) {
+          setCacheMeta({ isStale: true, updatedAt: cachedTimestamp });
+          setError(null);
+        } else {
+          let recovered = false;
+          try {
+            const fallbackKeys = [cacheKey, defaultCacheKey, legacyCacheKey];
+            for (const k of fallbackKeys) {
+              const cached = localStorage.getItem(k) || sessionStorage.getItem(k);
+              if (cached) {
+                const parsed = JSON.parse(cached);
+                if (applyCachedPayload(parsed)) {
+                  setCacheMeta({ isStale: true, updatedAt: parsed.timestamp || null });
+                  recovered = true;
+                  break;
+                }
+              }
+            }
+          } catch (cacheErr) {}
+
+          if (!recovered) {
+            setError("Connexion instable ou interrompue : impossible de charger les statistiques du tableau de bord pour le moment.");
           }
-        } catch (cacheErr) {}
+        }
       } else {
         console.error("Dashboard Stats Error:", err);
-        setError(err.message || "Impossible de charger les statistiques.");
+        if (!hasLoadedFromCache) {
+          setError(err?.message || "Impossible de charger les statistiques.");
+        }
       }
     } finally {
       setLoading(false);
@@ -1604,6 +1722,18 @@ const Dashboard: React.FC<{ user: UserProfile }> = ({ user }) => {
 
   useEffect(() => {
     fetchDashboardStats();
+  }, [fetchDashboardStats]);
+
+  // Listen to explicit retry triggers (from skeletons) and automatic online recovery
+  useEffect(() => {
+    const handleRetryView = () => fetchDashboardStats();
+    const handleOnlineRecover = () => fetchDashboardStats();
+    window.addEventListener('edunova_retry_active_view', handleRetryView);
+    window.addEventListener('online', handleOnlineRecover);
+    return () => {
+      window.removeEventListener('edunova_retry_active_view', handleRetryView);
+      window.removeEventListener('online', handleOnlineRecover);
+    };
   }, [fetchDashboardStats]);
 
   // Real-time synchronization for dashboard statistics
@@ -2073,6 +2203,40 @@ const Dashboard: React.FC<{ user: UserProfile }> = ({ user }) => {
       <div className="max-w-7xl mx-auto px-4 sm:px-5 lg:px-6 2xl:px-8 pt-3 sm:pt-3.5 lg:pt-4 flex flex-col gap-4 sm:gap-5 lg:gap-6">
         {/* System & Notification Banners - Masqué automatiquement sans espace fantôme si aucun bandeau actif */}
         <div className="flex flex-col gap-3 empty:hidden [&:not(:has(>*))]:hidden">
+          {(!isOnline || cacheMeta.isStale) && (
+            <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-2.5 bg-amber-50 border border-amber-200/90 text-amber-900 rounded-xl shadow-2xs text-xs">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <AlertTriangle size={15} className="text-amber-600 shrink-0" />
+                <span className="font-semibold">
+                  {!isOnline
+                    ? 'Mode hors-ligne : données locales affichées instantanément sans blocage.'
+                    : 'Connexion instable : affichage du dernier instantané local en attente de resynchronisation.'}
+                  {cacheMeta.updatedAt && (
+                    <span className="ml-1.5 font-normal text-amber-700">
+                      (Sauvegarde : {new Date(cacheMeta.updatedAt).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })})
+                    </span>
+                  )}
+                </span>
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => fetchDashboardStats()}
+                  className="inline-flex items-center gap-1 px-2.5 py-1 bg-white hover:bg-amber-100/60 text-amber-900 border border-amber-300/80 rounded-lg font-bold transition-colors cursor-pointer"
+                >
+                  <RefreshCcw size={12} />
+                  Réessayer
+                </button>
+                <button
+                  type="button"
+                  onClick={() => navigate('/offline')}
+                  className="inline-flex items-center gap-1 px-2.5 py-1 bg-slate-900 hover:bg-slate-800 text-white rounded-lg font-bold transition-colors cursor-pointer"
+                >
+                  Coffre Hors-ligne
+                </button>
+              </div>
+            </div>
+          )}
           <NotificationBanner userId={user.id} schoolId={user.school_id || ''} />
           <AutonomousAdminWarningBanner user={user} />
           <AiQuotaAlertBanner user={user} />

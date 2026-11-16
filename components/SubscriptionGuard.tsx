@@ -109,6 +109,15 @@ export const SubscriptionGuard: React.FC<SubscriptionGuardProps> = ({ user, chil
         }
       }
 
+      // If browser is offline, never stall on a live check
+      if (typeof navigator !== 'undefined' && !navigator.onLine) {
+        if (isMounted) {
+          if (!cachedSchool) setIsActive(true);
+          setLoading(false);
+        }
+        return;
+      }
+
       try {
         const queryPromise = supabase
           .from('schools')
@@ -116,11 +125,11 @@ export const SubscriptionGuard: React.FC<SubscriptionGuardProps> = ({ user, chil
           .eq('id', user.school_id)
           .single();
 
-        // 8-second timeout that gracefully resolves instead of rejecting with an unhandled exception
+        // 3.5-second timeout so slow networks never stall boot
         const timeoutPromise = new Promise<{ data: any; error: any; isTimeout?: boolean }>((resolve) => {
           timeoutId = setTimeout(() => {
             resolve({ data: cachedSchool || null, error: null, isTimeout: true });
-          }, 8000);
+          }, 3500);
         });
 
         const raceResult = await Promise.race([queryPromise, timeoutPromise]) as any;

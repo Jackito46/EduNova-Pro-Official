@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { ShieldAlert, RefreshCw } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
 import Sidebar from './Sidebar';
 import ConnectivityBanner from './ConnectivityBanner';
 import { SuperAdminRoute } from './SuperAdminRoute';
@@ -18,9 +17,11 @@ import { AiQuotaAlertBanner } from './AiQuotaAlertBanner';
 import { AutonomousAdminWarningBanner } from './AutonomousAdminWarningBanner';
 import { PayrollSensitiveNotificationListener } from './PayrollSensitiveNotificationListener';
 import { GlobalShortcuts } from './GlobalShortcuts';
-import { ModernDashboardSkeleton } from './SkeletonLoader';
+import { ModernDashboardSkeleton, FluidLoadingState } from './SkeletonLoader';
 import { UserProfile, UserRole } from '../types';
 import { lazyWithRetry } from '../utils/lazyWithRetry';
+import { OfflineDashboard } from './OfflineDashboard';
+import { scheduleIdleRoutePrefetch } from '../utils/routePrefetch';
 
 const Dashboard = lazyWithRetry(() => import('./Dashboard'));
 const StudentForm = lazyWithRetry(() => import('./StudentForm'));
@@ -74,7 +75,6 @@ const AuditLogsView = lazyWithRetry(() => import('./AuditLogsView').then(m => ({
 const ValidationList = lazyWithRetry(() => import('./ValidationList'));
 const ForcePasswordChange = lazyWithRetry(() => import('./ForcePasswordChange').then(m => ({ default: m.ForcePasswordChange })));
 const PwaInstallModal = lazyWithRetry(() => import('./PwaInstallModal').then(m => ({ default: m.PwaInstallModal })));
-const OfflineDashboard = lazyWithRetry(() => import('./OfflineDashboard').then(m => ({ default: m.OfflineDashboard })));
 const SuperAdminDashboard = lazyWithRetry(() => import('./SuperAdminDashboard').then(m => ({ default: m.SuperAdminDashboard })));
 const SystemHealthView = lazyWithRetry(() => import('./SystemHealthView').then(m => ({ default: m.SystemHealthView })));
 const EmailModule = lazyWithRetry(() => import('./EmailModule'));
@@ -88,12 +88,94 @@ interface AuthenticatedShellProps {
   maintenanceMode: boolean;
 }
 
+const getRouteLoadingLabel = (pathname: string): string => {
+  if (pathname.startsWith('/settings/ecole') || pathname === '/settings' || pathname === '/parametres') {
+    return 'Chargement : Identité Établissement...';
+  }
+  if (pathname.startsWith('/settings/utilisateurs')) return 'Chargement : Gestion des Utilisateurs...';
+  if (pathname.startsWith('/settings/audit')) return 'Chargement : Journal d’Audit...';
+  if (pathname.startsWith('/eleves')) return 'Chargement : Gestion des Élèves...';
+  if (pathname.startsWith('/classes') || pathname.startsWith('/matieres')) return 'Chargement : Classes & Matières...';
+  if (pathname.startsWith('/notes')) return 'Chargement : Saisie des Notes...';
+  if (pathname.startsWith('/presences')) return 'Chargement : Suivi des Présences...';
+  if (pathname.startsWith('/bulletins')) return 'Chargement : Édition des Bulletins...';
+  if (pathname.startsWith('/economat') || pathname === '/fees') return 'Chargement : Espace Économat & Finance...';
+  if (pathname.startsWith('/personnel')) return 'Chargement : Ressources Humaines...';
+  if (pathname.startsWith('/rapports')) return 'Chargement : Rapports & Bilans...';
+  if (pathname.startsWith('/communication')) return 'Chargement : Communication...';
+  return 'Ouverture de la section...';
+};
+
+const RouteSuspenseFallback: React.FC<{ pathname: string; onRetry: () => void }> = ({ pathname, onRetry }) => {
+  const [isSlowWait, setIsSlowWait] = useState(() =>
+    typeof navigator !== 'undefined' ? !navigator.onLine : false
+  );
+
+  useEffect(() => {
+    const timer = setTimeout(() => setIsSlowWait(true), 2200);
+    const onOffline = () => setIsSlowWait(true);
+    window.addEventListener('offline', onOffline);
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener('offline', onOffline);
+    };
+  }, [pathname]);
+
+  if (pathname === '/' || pathname === '/dashboard') {
+    return <ModernDashboardSkeleton onRetry={onRetry} />;
+  }
+
+  const isOffline = typeof navigator !== 'undefined' && !navigator.onLine;
+  return (
+    <div className="max-w-3xl mx-auto my-8 bg-white rounded-2xl border border-slate-200/80 shadow-sm p-8 text-center">
+      <FluidLoadingState
+        message={getRouteLoadingLabel(pathname)}
+        subtext={
+          isOffline
+            ? 'Connexion hors-ligne : ce module doit être en cache pour s’ouvrir sans réseau.'
+            : 'Préparation de l’interface en cours...'
+        }
+      />
+      {isSlowWait && (
+        <div className="mt-2 pt-4 border-t border-slate-100 flex flex-wrap items-center justify-center gap-2.5 text-xs">
+          <button
+            type="button"
+            onClick={onRetry}
+            className="px-4 py-2 rounded-xl bg-slate-900 text-white font-semibold hover:bg-slate-800 transition-colors cursor-pointer"
+          >
+            Réessayer l'ouverture
+          </button>
+          <button
+            type="button"
+            onClick={() => { window.location.hash = '#/offline'; }}
+            className="px-4 py-2 rounded-xl bg-rose-50 text-rose-700 border border-rose-200 font-semibold hover:bg-rose-100 transition-colors cursor-pointer"
+          >
+            Ouvrir le Coffre Hors-ligne
+          </button>
+          <button
+            type="button"
+            onClick={() => { window.location.hash = '#/'; }}
+            className="px-4 py-2 rounded-xl bg-slate-100 text-slate-700 font-semibold hover:bg-slate-200 transition-colors cursor-pointer"
+          >
+            Tableau de Bord
+          </button>
+        </div>
+      )}
+    </div>
+  );
+};
+
 const AuthenticatedRoutes: React.FC<AuthenticatedShellProps> = ({
   user,
   purgeSystemState,
   maintenanceMode
 }) => {
   const location = useLocation();
+  const [routeRetryNonce, setRouteRetryNonce] = useState(0);
+
+  useEffect(() => {
+    scheduleIdleRoutePrefetch();
+  }, []);
 
   const isPwaStandalone = useMemo(() => {
     if (typeof window === 'undefined') return false;
@@ -273,18 +355,17 @@ const AuthenticatedRoutes: React.FC<AuthenticatedShellProps> = ({
                 <AiQuotaAlertBanner user={user} />
               </>
             )}
-            <ErrorBoundary key={location.pathname}>
-              <AnimatePresence mode="wait" initial={false}>
-                <motion.div
-                  key={location.pathname}
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  transition={{ duration: 0.12, ease: 'easeOut' }}
-                  className="w-full min-w-0"
+            <ErrorBoundary key={`${location.pathname}-${routeRetryNonce}`}>
+              <div key={location.pathname} className="w-full min-w-0 animate-in fade-in duration-150">
+                <React.Suspense
+                  fallback={
+                    <RouteSuspenseFallback
+                      pathname={location.pathname}
+                      onRetry={() => setRouteRetryNonce((n) => n + 1)}
+                    />
+                  }
                 >
-                  <React.Suspense fallback={<ModernDashboardSkeleton />}>
-                    <Routes location={location}>
+                  <Routes location={location}>
                       <Route path="/" element={<Dashboard user={user} />} />
                       <Route path="/dashboard" element={<Navigate to="/" replace />} />
                       <Route path="/offline" element={<RoleGuard user={user} allowedRoles={allStaffRoles}><OfflineDashboard user={user} /></RoleGuard>} />
@@ -399,11 +480,10 @@ const AuthenticatedRoutes: React.FC<AuthenticatedShellProps> = ({
                       <Route path="/settings/utilisateurs" element={<RoleGuard user={user} allowedRoles={adminRoles}><UserManagementView currentUser={user} /></RoleGuard>} />
                       <Route path="/settings/audit" element={<RoleGuard user={user} allowedRoles={adminRoles}><AuditLogsView user={user} /></RoleGuard>} />
 
-                      <Route path="*" element={<Navigate to="/" replace />} />
-                    </Routes>
-                  </React.Suspense>
-                </motion.div>
-              </AnimatePresence>
+                    <Route path="*" element={<Navigate to="/" replace />} />
+                  </Routes>
+                </React.Suspense>
+              </div>
             </ErrorBoundary>
 
             {!isPwaStandalone && <AppFooter />}

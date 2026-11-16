@@ -76,16 +76,62 @@ export const FluidLoadingState: React.FC<{ message?: string; subtext?: string }>
   </div>
 );
 
+const SlowNetworkEscapeBar: React.FC<{ onRetry?: () => void }> = ({ onRetry }) => {
+  const [showHelper, setShowHelper] = React.useState(() =>
+    typeof navigator !== 'undefined' ? !navigator.onLine : false
+  );
+
+  React.useEffect(() => {
+    const timer = setTimeout(() => setShowHelper(true), 3000);
+    const onOffline = () => setShowHelper(true);
+    window.addEventListener('offline', onOffline);
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener('offline', onOffline);
+    };
+  }, []);
+
+  if (!showHelper) return null;
+  const isOffline = typeof navigator !== 'undefined' && !navigator.onLine;
+  const isAlreadyOfflineRoute = typeof window !== 'undefined' && window.location.hash.includes('/offline');
+
+  return (
+    <div className="mt-4 pt-4 border-t border-slate-100 flex flex-wrap items-center justify-center gap-2.5 text-xs">
+      <span className="text-slate-500 font-medium">
+        {isOffline ? 'Connexion hors-ligne détectée.' : 'Chargement plus long que prévu ?'}
+      </span>
+      <button
+        type="button"
+        onClick={() => (onRetry ? onRetry() : window.dispatchEvent(new CustomEvent('edunova_retry_active_view')))}
+        className="px-3.5 py-1.5 rounded-lg bg-slate-900 text-white font-semibold hover:bg-slate-800 transition-colors cursor-pointer"
+      >
+        Réessayer
+      </button>
+      {!isAlreadyOfflineRoute && (
+        <button
+          type="button"
+          onClick={() => { window.location.hash = '#/offline'; }}
+          className="px-3.5 py-1.5 rounded-lg bg-rose-50 text-rose-700 border border-rose-200 font-semibold hover:bg-rose-100 transition-colors cursor-pointer"
+        >
+          Coffre Hors-ligne
+        </button>
+      )}
+    </div>
+  );
+};
+
 export const ModernRegistrySkeleton: React.FC<{ 
   title?: string;
   subtitle?: string;
   rows?: number;
   type?: 'table' | 'cards';
+  onRetry?: () => void;
 }> = ({ 
   title = "Chargement du registre en cours...", 
   subtitle = "Connexion sécurisée avec la base de données...",
   rows = 6,
-  type = 'table'
+  type = 'table',
+  onRetry
 }) => (
   <div className="space-y-6 animate-in fade-in duration-300 max-w-7xl mx-auto">
     {/* Banner Skeleton */}
@@ -102,9 +148,23 @@ export const ModernRegistrySkeleton: React.FC<{
           <p className="text-xs text-slate-400 font-medium">{subtitle}</p>
         </div>
       </div>
-      <div className="flex items-center gap-3 w-full md:w-auto">
-        <Skeleton className="h-10 w-28 bg-slate-800/80 rounded-2xl" />
-        <Skeleton className="h-10 w-36 bg-indigo-600/40 rounded-2xl" />
+      <div className="flex items-center gap-2 w-full md:w-auto justify-end">
+        <button
+          type="button"
+          onClick={() => { window.location.hash = '#/offline'; }}
+          className="px-3.5 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-semibold transition-colors cursor-pointer whitespace-nowrap"
+        >
+          Mode Hors-ligne
+        </button>
+        {onRetry && (
+          <button
+            type="button"
+            onClick={onRetry}
+            className="px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold transition-colors cursor-pointer whitespace-nowrap"
+          >
+            Réessayer
+          </button>
+        )}
       </div>
     </div>
 
@@ -151,14 +211,17 @@ export const ModernRegistrySkeleton: React.FC<{
 export const ModernDashboardSkeleton: React.FC<{
   title?: string;
   subtitle?: string;
+  onRetry?: () => void;
 }> = ({
   title = "Initialisation du Tableau de Bord...",
-  subtitle = "Chargement sécurisé des indicateurs clés, finances et données académiques en temps réel..."
+  subtitle = "Chargement sécurisé des indicateurs clés, finances et données académiques en temps réel...",
+  onRetry
 }) => (
   <div className="space-y-8 animate-in fade-in duration-300 max-w-7xl mx-auto w-full p-4 md:p-8">
     {/* Light White Card Header with Fluid Loading State */}
     <div className="bg-white p-8 rounded-3xl border border-slate-200/80 shadow-sm flex flex-col items-center justify-center text-center">
       <FluidLoadingState message={title} subtext={subtitle} />
+      <SlowNetworkEscapeBar onRetry={onRetry} />
     </div>
 
     {/* 4 Bento KPI Cards Skeletons */}

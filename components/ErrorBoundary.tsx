@@ -36,30 +36,31 @@ export class ErrorBoundary extends Component<Props, State> {
     if (isRefreshTokenError(error)) {
       console.warn('Refresh token error detected in ErrorBoundary, clearing auth storage...');
       clearAuthStorage();
-      if (typeof window !== 'undefined') {
-         setTimeout(() => {
-             window.location.hash = '#/';
-             window.location.reload();
-         }, 1000);
+      if (typeof window !== 'undefined' && navigator.onLine) {
+        setTimeout(() => {
+          window.location.hash = '#/';
+          window.location.reload();
+        }, 1000);
       }
       return;
     }
 
     if (isChunkLoadError(error)) {
       console.warn('Erreur de chargement de module dynamique détectée par ErrorBoundary:', error);
-      if (typeof window !== 'undefined') {
+      // NEVER reload automatically while offline (wipes app state and fails offline!)
+      if (typeof window !== 'undefined' && navigator.onLine) {
         const chunkReloadKey = 'chunk_reload_attempt';
         const lastAttempt = sessionStorage.getItem(chunkReloadKey);
         const now = Date.now();
-        // Si aucun rechargement dans les 20 dernières secondes, auto-reload transparent
-        if (!lastAttempt || now - Number(lastAttempt) > 20000) {
+        if (!lastAttempt || now - Number(lastAttempt) > 30000) {
           sessionStorage.setItem(chunkReloadKey, String(now));
           setTimeout(() => {
-            window.location.reload();
+            if (navigator.onLine) window.location.reload();
           }, 300);
           return;
         }
       }
+      return;
     }
 
     console.error('Uncaught error in ErrorBoundary:', error, errorInfo);
@@ -69,24 +70,31 @@ export class ErrorBoundary extends Component<Props, State> {
     if (this.state.hasError) {
       const isAuthError = isRefreshTokenError(this.state.error);
       const isChunkError = isChunkLoadError(this.state.error);
+      const isOffline = typeof navigator !== 'undefined' && !navigator.onLine;
 
       return (
-        <div className="h-full min-h-[400px] bg-slate-50 flex flex-col items-center justify-center p-6 rounded-2xl border-2 border-dashed border-slate-200">
-          <div className="bg-white p-8 rounded-2xl shadow-sm max-w-2xl w-full text-center">
-            <div className={`w-16 h-16 ${isAuthError ? 'bg-indigo-100 text-indigo-600' : isChunkError ? 'bg-blue-100 text-blue-600' : 'bg-rose-100 text-rose-600'} rounded-full flex items-center justify-center mx-auto mb-4 text-3xl`}>
-              {isAuthError ? '🔒' : isChunkError ? '🔄' : '⚠️'}
+        <div className="h-full min-h-[380px] bg-slate-50 flex flex-col items-center justify-center p-6 rounded-2xl border border-slate-200">
+          <div className="bg-white p-8 rounded-2xl shadow-sm border border-slate-200/80 max-w-xl w-full text-center">
+            <div className={`w-14 h-14 ${isAuthError ? 'bg-indigo-100 text-indigo-600' : isChunkError ? 'bg-amber-100 text-amber-700' : 'bg-rose-100 text-rose-600'} rounded-2xl flex items-center justify-center mx-auto mb-4 text-2xl font-bold`}>
+              {isAuthError ? '🔒' : isChunkError ? '📶' : '⚠️'}
             </div>
-            <h1 className="text-2xl font-semibold text-slate-900 tracking-tight mb-2 ">
-              {isAuthError ? 'Session expirée' : isChunkError ? 'Mise à jour disponible' : 'Oups ! Une erreur est survenue'}
-            </h1>
-            <p className="text-slate-500 mb-6">
-              {isAuthError 
-                ? 'Votre session de sécurité a expiré. Veuillez vous reconnecter pour continuer.' 
+            <h1 className="text-xl font-bold text-slate-900 tracking-tight mb-2">
+              {isAuthError
+                ? 'Session expirée'
                 : isChunkError
-                ? 'Une mise à jour des composants système a été installée ou la connexion réseau a été renouvelée. Veuillez actualiser pour afficher la version à jour.'
-                : 'Un problème inattendu s\'est produit sur cette page. Vous pouvez essayer de recharger ou naviguer vers une autre section.'}
+                  ? (isOffline ? 'Module non disponible hors-ligne' : 'Chargement interrompu')
+                  : 'Oups ! Une erreur est survenue'}
+            </h1>
+            <p className="text-slate-600 text-sm mb-6 leading-relaxed">
+              {isAuthError
+                ? 'Votre session de sécurité a expiré. Veuillez vous reconnecter pour continuer.'
+                : isChunkError
+                  ? (isOffline
+                      ? 'Votre connexion Internet est coupée et cette page n’était pas encore en cache. Vous pouvez ouvrir le Coffre Hors-ligne ou revenir au Tableau de Bord.'
+                      : 'Le téléchargement de ce module a été interrompu par une connexion instable. Cliquez sur Réessayer.')
+                  : 'Un problème inattendu s’est produit sur cette page. Vous pouvez réessayer sans perdre votre navigation.'}
             </p>
-            
+
             {(!isAuthError && !isChunkError && import.meta.env.DEV) && (
               <div className="text-left mb-6">
                 <p className="text-xs font-bold text-slate-400 tracking-wider mb-2">Détails techniques</p>
@@ -96,24 +104,52 @@ export class ErrorBoundary extends Component<Props, State> {
               </div>
             )}
 
-            <div className="flex flex-col sm:flex-row gap-3 justify-center">
-              {!isAuthError && !isChunkError && (
-                <button 
-                  onClick={() => window.history.back()}
-                  className="px-6 py-3 bg-slate-100 text-slate-700 rounded-xl hover:bg-slate-200 font-bold transition-colors cursor-pointer"
+            <div className="flex flex-wrap gap-2.5 justify-center">
+              {!isAuthError && (
+                <button
+                  type="button"
+                  onClick={() => this.setState({ hasError: false, error: null })}
+                  className="px-5 py-2.5 bg-slate-900 text-white rounded-xl hover:bg-slate-800 text-sm font-semibold transition-colors cursor-pointer"
                 >
-                  Retour en arrière
+                  Réessayer
                 </button>
               )}
-              <button 
-                onClick={() => {
-                  if (isAuthError) clearAuthStorage();
-                  window.location.reload();
-                }}
-                className={`px-6 py-3 ${isAuthError ? 'bg-indigo-600' : isChunkError ? 'bg-blue-600 hover:bg-blue-700' : 'bg-[#1e3a8a]'} text-white rounded-xl hover:opacity-90 font-bold transition-colors shadow-lg shadow-blue-900/20 cursor-pointer`}
-              >
-                {isAuthError ? 'Se reconnecter' : isChunkError ? 'Actualiser l\'application' : 'Recharger la page'}
-              </button>
+              {isChunkError && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    window.location.hash = '#/offline';
+                    this.setState({ hasError: false, error: null });
+                  }}
+                  className="px-5 py-2.5 bg-rose-600 text-white rounded-xl hover:bg-rose-700 text-sm font-semibold transition-colors cursor-pointer"
+                >
+                  Coffre Hors-ligne
+                </button>
+              )}
+              {!isAuthError && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    window.location.hash = '#/';
+                    this.setState({ hasError: false, error: null });
+                  }}
+                  className="px-5 py-2.5 bg-slate-100 text-slate-700 rounded-xl hover:bg-slate-200 text-sm font-semibold transition-colors cursor-pointer"
+                >
+                  Tableau de Bord
+                </button>
+              )}
+              {(isAuthError || (!isOffline && !isChunkError)) && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (isAuthError) clearAuthStorage();
+                    window.location.reload();
+                  }}
+                  className="px-5 py-2.5 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 text-sm font-semibold transition-colors cursor-pointer"
+                >
+                  {isAuthError ? 'Se reconnecter' : 'Recharger l’application'}
+                </button>
+              )}
             </div>
           </div>
         </div>

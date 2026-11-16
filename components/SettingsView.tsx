@@ -71,7 +71,10 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useSearchParams, Link } from 'react-router-dom';
-import { supabase } from '../supabase';
+import { supabase, isNetworkOrTimeoutError, withTimeout } from '../supabase';
+import { useOnlineStatus } from '../hooks/useOnlineStatus';
+import { ConnectionRetryFallback } from './ConnectionRetryFallback';
+import { FluidLoadingState } from './SkeletonLoader';
 import { UserProfile, UserRole, SchoolType } from '../types';
 import Modal from './Modal';
 import { toast } from 'sonner';
@@ -190,7 +193,13 @@ const SettingsView: React.FC<SettingsViewProps> = ({ user }) => {
     } catch (e) {}
   };
   const [paymentSubTab, setPaymentSubTab] = useState<'methods' | 'banks'>('methods');
+  const { isOnline } = useOnlineStatus();
   const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState<string | null>(null);
+  const [usingLocalCache, setUsingLocalCache] = useState<{ active: boolean; timestamp: number | null }>({
+    active: false,
+    timestamp: null
+  });
   const [saving, setSaving] = useState(false);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [schoolData, setSchoolData] = useState<any>({});
@@ -590,22 +599,119 @@ const SettingsView: React.FC<SettingsViewProps> = ({ user }) => {
     fetchData();
   }, [user.school_id]);
 
+  // Re-synchroniser dès le retour réseau ou clic sur Réessayer
+  useEffect(() => {
+    const handleRetry = () => fetchData();
+    const handleOnline = () => fetchData();
+    window.addEventListener('edunova_retry_active_view', handleRetry);
+    window.addEventListener('online', handleOnline);
+    return () => {
+      window.removeEventListener('edunova_retry_active_view', handleRetry);
+      window.removeEventListener('online', handleOnline);
+    };
+  }, [user.school_id]);
+
   const fetchData = async () => {
-    if (!user.school_id) return;
-    setLoading(true);
+    if (!user.school_id) {
+      setLoading(false);
+      return;
+    }
+
+    const settingsCacheKey = `edunova_cached_settings_${user.school_id}`;
+    let hasHydratedLocal = false;
+    let cachedTs: number | null = null;
+
+    // 1. Hydratation instantanée (< 5 ms) depuis le cache local ou SchoolContext
+    try {
+      const cachedRaw = localStorage.getItem(settingsCacheKey);
+      if (cachedRaw) {
+        const parsed = JSON.parse(cachedRaw);
+        if (parsed && parsed.schoolData) {
+          setSchoolData(parsed.schoolData);
+          if (parsed.sessionTimeoutInput != null) setSessionTimeoutInput(Number(parsed.sessionTimeoutInput));
+          if (Array.isArray(parsed.years)) setYears(parsed.years);
+          if (parsed.primaryAdmin) setPrimaryAdmin(parsed.primaryAdmin);
+          if (parsed.moncashConfig) setMoncashConfig(parsed.moncashConfig);
+          if (Array.isArray(parsed.exchangeRates) && parsed.exchangeRates.length > 0) {
+            setExchangeRates(parsed.exchangeRates);
+            setExchangeRate(parsed.exchangeRates[0]);
+            if (parsed.exchangeRates[0].rate_usd_to_htg != null) {
+              setNewExchangeRate(parsed.exchangeRates[0].rate_usd_to_htg.toString());
+            }
+          }
+          cachedTs = parsed.timestamp || null;
+          hasHydratedLocal = true;
+          setLoading(false);
+        }
+      } else if (school && school.id === user.school_id) {
+        let ctxSettings: any = {};
+        if (typeof school.global_settings === 'string') {
+          try { ctxSettings = JSON.parse(school.global_settings); } catch (e) {}
+        } else {
+          ctxSettings = school.global_settings || {};
+        }
+        setSchoolData({
+          ...school,
+          has_multi_campus: !!(school as any).has_multi_campus,
+          has_api_gateways: !!(school as any).has_api_gateways,
+          global_settings: ctxSettings,
+          name: school.name || "",
+          address: (school as any).address || "",
+          phone: (school as any).phone || "",
+          email: (school as any).email || "",
+          website: (school as any).website || ctxSettings.website || "",
+          nif: ctxSettings.nif || '',
+          foundation_year: ctxSettings.foundation_year || '',
+          motto: ctxSettings.motto || ''
+        });
+        setSessionTimeoutInput(Number(ctxSettings.session_timeout_minutes || 10));
+        hasHydratedLocal = true;
+        setLoading(false);
+      }
+    } catch (e) {}
+
+    // 2. Court-circuit immédiat hors-ligne (0ms, aucun freeze)
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      if (hasHydratedLocal) {
+        setUsingLocalCache({ active: true, timestamp: cachedTs });
+        setFetchError(null);
+      } else {
+        setFetchError("Mode hors-ligne actif : les paramètres détaillés de l'établissement ne sont pas encore en cache local.");
+      }
+      setLoading(false);
+      return;
+    }
+
+    if (!hasHydratedLocal) {
+      setLoading(true);
+    }
+    setFetchError(null);
+
     let parsedSettings: any = {};
+    let finalSchoolDataSnapshot: any = null;
+    let latestYears: any[] | null = null;
+    let latestPrimaryAdmin: any = null;
+    let latestGatewayData: any = null;
+    let latestExchangeRates: any[] | null = null;
+
     try {
       if (isSuperAdmin) {
-        fetchSchoolsForGateways();
+        fetchSchoolsForGateways().catch(() => {});
       }
 
-      const [schoolRes, yearsRes, rateRes] = await Promise.all([
-        supabase.from('schools').select('*').eq('id', user.school_id).single(),
-        supabase.from('academic_years').select('*').eq('school_id', user.school_id).order('label', { ascending: false }),
-        supabase.from('exchange_rates').select('*').eq('school_id', user.school_id).order('created_at', { ascending: false }).limit(10)
-      ]) as any;
+      const [schoolRes, yearsRes, rateRes] = await withTimeout(
+        Promise.all([
+          supabase.from('schools').select('*').eq('id', user.school_id).single(),
+          supabase.from('academic_years').select('*').eq('school_id', user.school_id).order('label', { ascending: false }),
+          supabase.from('exchange_rates').select('*').eq('school_id', user.school_id).order('created_at', { ascending: false }).limit(10)
+        ]) as any,
+        8000,
+        "Délai dépassé lors du chargement des paramètres de l'établissement."
+      ) as any;
 
-      if (schoolRes.data) {
+      if (schoolRes?.error) throw schoolRes.error;
+
+      if (schoolRes?.data) {
         const data = schoolRes.data;
         if (typeof data.global_settings === 'string') {
           try { parsedSettings = JSON.parse(data.global_settings); } catch (e) {}
@@ -613,7 +719,6 @@ const SettingsView: React.FC<SettingsViewProps> = ({ user }) => {
           parsedSettings = data.global_settings || {};
         }
 
-        // Merge settings into schoolData for easier UI handling
         const finalSchoolData = {
           ...data,
           has_multi_campus: !!data.has_multi_campus,
@@ -628,37 +733,48 @@ const SettingsView: React.FC<SettingsViewProps> = ({ user }) => {
           foundation_year: parsedSettings.foundation_year || '',
           motto: parsedSettings.motto || ''
         };
+        finalSchoolDataSnapshot = finalSchoolData;
         setSchoolData(finalSchoolData);
         setSessionTimeoutInput(Number(parsedSettings.session_timeout_minutes || 10));
       }
-      if (yearsRes.data) setYears(yearsRes.data);
-      
-      // Fetch primary admin (first user created for this school)
-      const { data: primaryAdminData } = await supabase
-        .from('profiles')
-        .select('id, email, full_name, created_at, role')
-        .eq('school_id', user.school_id)
-        .order('created_at', { ascending: true })
-        .limit(1)
-        .maybeSingle();
-
-      if (primaryAdminData) {
-        setPrimaryAdmin(primaryAdminData);
+      if (yearsRes?.data) {
+        latestYears = yearsRes.data;
+        setYears(yearsRes.data);
       }
 
-      // Fetch MonCash config
-      const { data: gatewayData } = await supabase
-        .from('payment_gateways')
-        .select('*')
-        .eq('school_id', user.school_id)
-        .eq('gateway_name', 'moncash')
-        .maybeSingle();
-      
-      if (gatewayData) {
-        setMoncashConfig(gatewayData);
+      // Requêtes secondaires bornées en parallèle avec tolérance aux pannes
+      const [primaryAdminRes, gatewayRes] = await withTimeout(
+        Promise.all([
+          supabase
+            .from('profiles')
+            .select('id, email, full_name, created_at, role')
+            .eq('school_id', user.school_id)
+            .order('created_at', { ascending: true })
+            .limit(1)
+            .maybeSingle(),
+          supabase
+            .from('payment_gateways')
+            .select('*')
+            .eq('school_id', user.school_id)
+            .eq('gateway_name', 'moncash')
+            .maybeSingle()
+        ]),
+        6000,
+        "Délai dépassé lors du chargement des informations complémentaires."
+      ).catch(() => [{ data: null }, { data: null }] as any);
+
+      if (primaryAdminRes?.data) {
+        latestPrimaryAdmin = primaryAdminRes.data;
+        setPrimaryAdmin(primaryAdminRes.data);
       }
 
-      if (rateRes.data && rateRes.data.length > 0) {
+      if (gatewayRes?.data) {
+        latestGatewayData = gatewayRes.data;
+        setMoncashConfig(gatewayRes.data);
+      }
+
+      if (rateRes?.data && rateRes.data.length > 0) {
+        latestExchangeRates = rateRes.data;
         setExchangeRates(rateRes.data);
         const latest = rateRes.data[0];
         setExchangeRate(latest);
@@ -667,17 +783,38 @@ const SettingsView: React.FC<SettingsViewProps> = ({ user }) => {
         }
       }
 
+      // Persister le snapshot complet dans localStorage pour consultation instantanée hors-ligne
+      if (finalSchoolDataSnapshot) {
+        const nowTs = Date.now();
+        try {
+          localStorage.setItem(settingsCacheKey, JSON.stringify({
+            schoolData: finalSchoolDataSnapshot,
+            sessionTimeoutInput: Number(parsedSettings.session_timeout_minutes || 10),
+            years: latestYears || years,
+            primaryAdmin: latestPrimaryAdmin || primaryAdmin,
+            moncashConfig: latestGatewayData || moncashConfig,
+            exchangeRates: latestExchangeRates || exchangeRates,
+            timestamp: nowTs
+          }));
+        } catch (e) {}
+      }
+      setUsingLocalCache({ active: false, timestamp: Date.now() });
+      setFetchError(null);
+
       // Fetch backup status & history (Super Admin exclusive to preserve Supabase 1 GB quota)
       if (isSuperAdmin) {
         try {
-          const backupData = await BackupClientService.getBackupsAndSettings();
+          const backupData = await withTimeout(
+            BackupClientService.getBackupsAndSettings(),
+            6000,
+            'Délai dépassé pour l\'historique de sauvegarde'
+          );
           const allBackups = backupData.backups || [];
           const schoolBackups = allBackups.filter(b => 
             !b.school_id || b.school_id === user.school_id || b.scope === 'FULL_DATABASE'
           );
           setRecentSchoolBackups(schoolBackups.slice(0, 10));
 
-          // Determine the most recent backup info
           const latestBackup = schoolBackups[0];
           if (latestBackup) {
             setLastBackupInfo({
@@ -730,9 +867,22 @@ const SettingsView: React.FC<SettingsViewProps> = ({ user }) => {
           }
         }
       }
-    } catch (err) {
-      console.error("Error fetching settings:", err);
-      toast.error("Erreur de chargement des paramètres");
+    } catch (err: any) {
+      const networkIssue = isNetworkOrTimeoutError(err) || (typeof navigator !== 'undefined' && !navigator.onLine);
+      console.warn("SettingsView fetchData:", err?.message || err);
+      if (hasHydratedLocal) {
+        setUsingLocalCache({ active: true, timestamp: cachedTs });
+        setFetchError(null);
+        if (!networkIssue) {
+          toast.error("Erreur lors de l'actualisation en direct — copie locale affichée.");
+        }
+      } else {
+        setFetchError(
+          networkIssue
+            ? "Connexion instable ou interrompue : impossible de charger les paramètres de l'établissement."
+            : (err?.message || "Erreur de chargement des paramètres.")
+        );
+      }
     } finally {
       setLoading(false);
     }
@@ -958,10 +1108,13 @@ const SettingsView: React.FC<SettingsViewProps> = ({ user }) => {
       return;
     }
 
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      toast.error("Connexion requise : l'enregistrement de l'identité de l'établissement nécessite une connexion Internet active.");
+      return;
+    }
+
     setSaving(true);
     try {
-      // Prepare the final payload.
-      // Fields that don't exist as columns will be safely stored in global_settings
       const extraFields = {
         website: schoolData.website || '',
         nif: schoolData.nif || '',
@@ -992,16 +1145,17 @@ const SettingsView: React.FC<SettingsViewProps> = ({ user }) => {
         logo_url: schoolData.logo_url,
         has_multi_campus: isSuperAdmin ? !!schoolData.has_multi_campus : !!school?.has_multi_campus,
         has_api_gateways: isSuperAdmin ? !!schoolData.has_api_gateways : !!school?.has_api_gateways,
-        // Send as an object since supabase-js handles json/jsonb stringification natively.
-        // If it's a text column, we must stringify it. We will send it as an object first, 
-        // but if the backend strictly requires text, it would reject it. Postgrest casts objects to JSON.
         global_settings: updatedSettings
       };
 
-      const { error } = await supabase
-        .from('schools')
-        .update(payload)
-        .eq('id', user.school_id);
+      const { error } = await withTimeout(
+        supabase
+          .from('schools')
+          .update(payload)
+          .eq('id', user.school_id),
+        9000,
+        "Délai dépassé lors de la sauvegarde des paramètres."
+      );
 
       if (error) throw error;
       
@@ -1015,10 +1169,10 @@ const SettingsView: React.FC<SettingsViewProps> = ({ user }) => {
 
       toast.success("Paramètres de l'école mis à jour");
       if (refreshSchool) await refreshSchool();
-      fetchData(); // Refresh to ensure state is clean
-    } catch (err) {
+      fetchData(); // Refresh to ensure state and local cache stay synced
+    } catch (err: any) {
       console.error("Error updating school:", err);
-      toast.error("Erreur lors de la mise à jour");
+      toast.error(isNetworkOrTimeoutError(err) ? "Connexion instable : impossible d'enregistrer maintenant." : "Erreur lors de la mise à jour");
     } finally {
       setSaving(false);
     }
@@ -1911,8 +2065,21 @@ const SettingsView: React.FC<SettingsViewProps> = ({ user }) => {
 
   if (loading) {
     return (
-      <div className="flex h-[60vh] items-center justify-center">
-        <Loader2 className="animate-spin text-slate-900" size={40} />
+      <FluidLoadingState
+        message="Chargement : Identité Établissement..."
+        subtext="Récupération des paramètres système, années scolaires et préférences locales..."
+      />
+    );
+  }
+
+  if (fetchError && !schoolData?.name) {
+    return (
+      <div className="flex min-h-[60vh] items-center justify-center p-6">
+        <ConnectionRetryFallback
+          message={fetchError}
+          onRetry={fetchData}
+          className="max-w-md w-full"
+        />
       </div>
     );
   }
@@ -2011,6 +2178,27 @@ const SettingsView: React.FC<SettingsViewProps> = ({ user }) => {
        </button>
       </div>
      </div>
+
+     {(!isOnline || usingLocalCache.active) && (
+       <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-2.5 bg-amber-50 border border-amber-200 text-amber-900 rounded-xl text-xs">
+         <div className="flex items-center gap-2">
+           <AlertTriangle size={15} className="text-amber-600 shrink-0" />
+           <span className="font-semibold">
+             {!isOnline
+               ? "Mode hors-ligne : consultation de l'identité établissement en cache local (sauvegardes cloud en attente de connexion)."
+               : "Connexion instable : copie locale des paramètres affichée sans interruption."}
+           </span>
+         </div>
+         <button
+           type="button"
+           onClick={fetchData}
+           className="inline-flex items-center gap-1 px-2.5 py-1 bg-white hover:bg-amber-100/70 border border-amber-300 rounded-lg font-bold transition-colors cursor-pointer"
+         >
+           <RefreshCw size={12} />
+           Synchroniser
+         </button>
+       </div>
+     )}
 
      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8">
        <div className="lg:col-span-4 xl:col-span-4 2xl:col-span-3 space-y-6">

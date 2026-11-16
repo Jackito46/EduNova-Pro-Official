@@ -55,7 +55,10 @@ export function getProjectFiles(dir: string, base: string = ''): { relPath: stri
       if (stat.size > 10 * 1024 * 1024) continue;
 
       const isBinary = [
-        '.png', '.jpg', '.jpeg', '.gif', '.webp', '.ico', '.pdf', '.woff', '.woff2', '.ttf', '.eot', '.mp3', '.wav', '.ogg'
+        '.png', '.jpg', '.jpeg', '.gif', '.webp', '.avif', '.heic', '.heif', '.bmp', '.tiff', '.tif', '.ico',
+        '.pdf', '.woff', '.woff2', '.ttf', '.otf', '.eot',
+        '.mp3', '.wav', '.ogg', '.m4a', '.aac', '.flac', '.mp4', '.webm', '.mov', '.avi',
+        '.wasm', '.bin', '.br', '.gz', '.zip'
       ].includes(ext);
 
       results.push({
@@ -195,7 +198,11 @@ export async function exportProjectToGitHub(
     const fileBuffer = fs.readFileSync(file.fullPath);
     let finalBuffer: Buffer;
 
-    if (file.isBinary) {
+    const looksLikeBinaryBuffer =
+      fileBuffer.includes(0) ||
+      !Buffer.from(fileBuffer.toString('utf-8'), 'utf-8').equals(fileBuffer);
+
+    if (file.isBinary || looksLikeBinaryBuffer) {
       finalBuffer = fileBuffer;
     } else {
       let textContent = fileBuffer.toString('utf-8');

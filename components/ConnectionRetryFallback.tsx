@@ -1,5 +1,5 @@
 import React from 'react';
-import { RefreshCcw, AlertCircle } from 'lucide-react';
+import { RefreshCcw, WifiOff, ShieldCheck } from 'lucide-react';
 
 interface ConnectionRetryFallbackProps {
   message?: string;
@@ -7,27 +7,47 @@ interface ConnectionRetryFallbackProps {
   className?: string;
 }
 
-export const ConnectionRetryFallback: React.FC<ConnectionRetryFallbackProps> = ({ 
-  message = "Une erreur de connexion est survenue.", 
+export const ConnectionRetryFallback: React.FC<ConnectionRetryFallbackProps> = ({
+  message = "Une erreur de connexion est survenue.",
   onRetry,
   className = ""
 }) => {
+  const isOffline = typeof navigator !== 'undefined' && !navigator.onLine;
+  const isAlreadyOfflineRoute = typeof window !== 'undefined' && window.location.hash.includes('/offline');
+
   return (
-    <div className={`flex flex-col items-center justify-center p-8 text-center space-y-4 bg-slate-50 rounded-2xl border-2 border-dashed border-slate-200 ${className}`}>
-      <div className="w-12 h-12 bg-rose-100 text-rose-600 rounded-xl flex items-center justify-center">
-        <AlertCircle size={24} />
+    <div className={`flex flex-col items-center justify-center p-8 text-center space-y-4 bg-white rounded-2xl border border-slate-200 shadow-sm ${className}`}>
+      <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${isOffline ? 'bg-amber-50 text-amber-600' : 'bg-rose-50 text-rose-600'}`}>
+        <WifiOff size={24} />
       </div>
-      <div className="space-y-1">
-        <p className="text-slate-900 font-bold text-sm">{message}</p>
-        <p className="text-slate-500 text-[10px] font-medium">Vérifiez votre connexion internet et réessayez.</p>
+      <div className="space-y-1.5">
+        <p className="text-slate-900 font-bold text-base">{message}</p>
+        <p className="text-slate-500 text-xs font-medium max-w-sm mx-auto leading-relaxed">
+          {isOffline
+            ? 'Votre appareil est hors-ligne. Réessayez dès que le réseau revient ou utilisez le Coffre Hors-ligne.'
+            : 'La connexion réseau est instable ou lente. Vous pouvez relancer la requête ou passer en mode hors-ligne.'}
+        </p>
       </div>
-      <button
-        onClick={onRetry}
-        className="inline-flex items-center gap-2 px-6 py-2.5 bg-indigo-600 text-white font-bold rounded-lg text-[10px] uppercase tracking-tight shadow-md shadow-indigo-500/20 hover:bg-indigo-500 transition-all active:scale-95"
-      >
-        <RefreshCcw size={14} />
-        Réessayer
-      </button>
+      <div className="flex flex-wrap items-center justify-center gap-2.5 pt-1">
+        <button
+          type="button"
+          onClick={onRetry}
+          className="inline-flex items-center gap-2 px-5 py-2.5 bg-slate-900 text-white font-semibold rounded-xl text-xs hover:bg-slate-800 transition-colors cursor-pointer"
+        >
+          <RefreshCcw size={14} />
+          Réessayer
+        </button>
+        {!isAlreadyOfflineRoute && (
+          <button
+            type="button"
+            onClick={() => { window.location.hash = '#/offline'; }}
+            className="inline-flex items-center gap-2 px-5 py-2.5 bg-rose-50 text-rose-700 border border-rose-200 font-semibold rounded-xl text-xs hover:bg-rose-100 transition-colors cursor-pointer"
+          >
+            <ShieldCheck size={14} />
+            Coffre Hors-ligne
+          </button>
+        )}
+      </div>
     </div>
   );
 };

@@ -5,12 +5,13 @@ import { CacheFirst, NetworkFirst, NetworkOnly, StaleWhileRevalidate } from 'wor
 import { ExpirationPlugin } from 'workbox-expiration';
 
 // Versioning des caches d'exécution pour garantir la purge immédiate lors d'une montée de version
-const CACHE_VERSION = 'v3.2';
+const CACHE_VERSION = 'v3.4';
 const CACHE_PREFIX = 'edunova';
 
 const CACHE_NAMES = {
   html: `${CACHE_PREFIX}-html-${CACHE_VERSION}`,
   static: `${CACHE_PREFIX}-static-${CACHE_VERSION}`,
+  chunks: `${CACHE_PREFIX}-chunks-${CACHE_VERSION}`,
   fonts: `${CACHE_PREFIX}-fonts-${CACHE_VERSION}`,
   supabase: `${CACHE_PREFIX}-supabase-${CACHE_VERSION}`,
 };
@@ -144,11 +145,28 @@ registerRoute(
   })
 );
 
-// 5. Cache des ressources statiques légères (images, styles, polices - PAS les scripts /assets/*.js !)
+// 5A. Cache immutable pour les chunks Vite hachés (/assets/Name-HASH.js|.css) : navigation 100% fluide hors-ligne
 registerRoute(
   ({ request, url }) => {
-    // Ne JAMAIS intercepter les scripts applicatifs Vite (/assets/*.js) avec StaleWhileRevalidate !
-    // Les scripts compilés sont versionnés par hash immutable et doivent venir du réseau direct.
+    const isHashedAsset = /\/assets\/.*-[a-zA-Z0-9_-]{6,}\.(js|css|mjs)$/i.test(url.pathname);
+    return isHashedAsset && (request.destination === 'script' || request.destination === 'style' || request.destination === '');
+  },
+  new CacheFirst({
+    cacheName: CACHE_NAMES.chunks,
+    plugins: [
+      new ExpirationPlugin({
+        maxEntries: 120,
+        maxAgeSeconds: 30 * 24 * 60 * 60, // 30 jours (les noms hachés sont immuables)
+        purgeOnQuotaError: true,
+      })
+    ]
+  })
+);
+
+// 5B. Cache des ressources statiques légères (images, styles non-hachés, polices)
+registerRoute(
+  ({ request, url }) => {
+    // Ne jamais mettre en cache StaleWhileRevalidate les scripts non-hachés
     if (request.destination === 'script' || url.pathname.includes('/assets/')) {
       return false;
     }
@@ -158,7 +176,7 @@ registerRoute(
     cacheName: CACHE_NAMES.static,
     plugins: [
       new ExpirationPlugin({
-        maxEntries: 60, // Limite stricte pour économiser l'espace de stockage
+        maxEntries: 60,
         maxAgeSeconds: 7 * 24 * 60 * 60, // 7 jours
         purgeOnQuotaError: true,
       })

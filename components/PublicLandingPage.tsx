@@ -192,6 +192,104 @@ const PartnerSchoolEmblem: React.FC<{ school: PartnerSchoolItem }> = ({ school }
   );
 };
 
+interface LandingSectionImageProps {
+  slug: 'hero-leadership' | 'bursar-mobile' | 'classroom-excellence';
+  widths: number[];
+  sizes: string;
+  alt: string;
+  width: number;
+  height: number;
+  priority?: 'high' | 'normal';
+  fallback: React.ReactNode;
+}
+
+const LandingSectionImage: React.FC<LandingSectionImageProps> = ({
+  slug,
+  widths,
+  sizes,
+  alt,
+  width,
+  height,
+  priority = 'normal',
+  fallback
+}) => {
+  // 0 = <picture> (AVIF -> WebP -> JPG), 1 = WebP direct, 2 = JPG direct, 3 = Fallback UI
+  const [stage, setStage] = useState<0 | 1 | 2 | 3>(0);
+
+  const buildSrcSet = (ext: 'avif' | 'webp' | 'jpg') =>
+    widths.map((w) => `/optimized/${slug}-${w}.${ext} ${w}w`).join(', ');
+
+  const defaultWidth = widths.includes(960) ? 960 : widths[widths.length - 1];
+  const isHigh = priority === 'high';
+
+  const handleImgError = () => {
+    setStage((prev) => (prev < 3 ? ((prev + 1) as 0 | 1 | 2 | 3) : 3));
+  };
+
+  if (stage === 3) {
+    return <>{fallback}</>;
+  }
+
+  if (stage === 1) {
+    return (
+      <img
+        src={`/optimized/${slug}-${defaultWidth}.webp`}
+        srcSet={buildSrcSet('webp')}
+        sizes={sizes}
+        alt={alt}
+        width={width}
+        height={height}
+        referrerPolicy="no-referrer"
+        loading="eager"
+        decoding={isHigh ? 'sync' : 'async'}
+        fetchPriority={isHigh ? 'high' : 'auto'}
+        onError={handleImgError}
+        className="block absolute inset-0 w-full h-full object-cover"
+      />
+    );
+  }
+
+  if (stage === 2) {
+    return (
+      <img
+        src={`/optimized/${slug}-${defaultWidth}.jpg`}
+        srcSet={buildSrcSet('jpg')}
+        sizes={sizes}
+        alt={alt}
+        width={width}
+        height={height}
+        referrerPolicy="no-referrer"
+        loading="eager"
+        decoding={isHigh ? 'sync' : 'async'}
+        fetchPriority={isHigh ? 'high' : 'auto'}
+        onError={handleImgError}
+        className="block absolute inset-0 w-full h-full object-cover"
+      />
+    );
+  }
+
+  return (
+    <picture className="block absolute inset-0 w-full h-full">
+      <source type="image/avif" srcSet={buildSrcSet('avif')} sizes={sizes} />
+      <source type="image/webp" srcSet={buildSrcSet('webp')} sizes={sizes} />
+      <img
+        src={`/optimized/${slug}-${defaultWidth}.jpg`}
+        srcSet={buildSrcSet('jpg')}
+        sizes={sizes}
+        alt={alt}
+        width={width}
+        height={height}
+        referrerPolicy="no-referrer"
+        loading="eager"
+        decoding={isHigh ? 'sync' : 'async'}
+        fetchPriority={isHigh ? 'high' : 'auto'}
+        onError={handleImgError}
+        className="block w-full h-full object-cover"
+      />
+    </picture>
+  );
+};
+
 export const SocialProofSection: React.FC = () => {
   const sectionRef = useRef<HTMLElement | null>(null);
   const [displayedCount, setDisplayedCount] = useState<number>(ACTIVE_ESTABLISHMENTS_TARGET);
@@ -248,11 +346,11 @@ export const SocialProofSection: React.FC = () => {
     <section
       ref={sectionRef}
       aria-labelledby="social-proof-heading"
-      className="py-12 sm:py-16 bg-white border-t border-slate-200/80"
+      className="py-7 sm:py-9 lg:py-10 bg-white border-t border-slate-200/80"
     >
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-8">
-        <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-6">
-          <div className="space-y-2 max-w-2xl">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-5 sm:space-y-6">
+        <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-4">
+          <div className="space-y-1.5 max-w-2xl">
             <div className="text-xs font-bold uppercase tracking-wider text-indigo-600">
               Réseau d&apos;Établissements Partenaires
             </div>
@@ -267,11 +365,11 @@ export const SocialProofSection: React.FC = () => {
             </p>
           </div>
 
-          <div className="shrink-0 rounded-xl border border-slate-200 bg-slate-50 px-6 py-4 flex items-center gap-5">
+          <div className="shrink-0 rounded-xl border border-slate-200 bg-slate-50 px-4 sm:px-5 py-3 flex items-center gap-4">
             <div className="text-3xl sm:text-4xl font-extrabold text-[#0B132B] tabular-nums tracking-tight">
               {displayedCount}
             </div>
-            <div className="h-9 w-px bg-slate-200" aria-hidden="true" />
+            <div className="h-8 w-px bg-slate-200" aria-hidden="true" />
             <div className="space-y-0.5">
               <div className="text-sm font-bold text-slate-900">Établissements actifs</div>
               <div className="text-xs text-slate-500 tabular-nums">
@@ -281,11 +379,11 @@ export const SocialProofSection: React.FC = () => {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5 sm:gap-3.5">
           {PARTNER_SCHOOLS.map((school) => (
             <div
               key={school.id}
-              className="flex items-center gap-3.5 rounded-xl border border-slate-200 bg-white p-4 hover:border-slate-300 transition-colors"
+              className="flex items-center gap-3 rounded-xl border border-slate-200 bg-white p-3 sm:p-3.5 hover:border-slate-300 transition-colors"
             >
               <PartnerSchoolEmblem school={school} />
               <div className="min-w-0">
@@ -313,9 +411,6 @@ export const PublicLandingPage: React.FC<PublicLandingPageProps> = ({
   const [scrolled, setScrolled] = useState(false);
   const [activeTab, setActiveTab] = useState<'finance' | 'academic' | 'payroll' | 'parents'>('finance');
   const [previewTab, setPreviewTab] = useState<'receipt' | 'report' | 'offline'>('receipt');
-  const [heroImgFailed, setHeroImgFailed] = useState(false);
-  const [bursarImgFailed, setBursarImgFailed] = useState(false);
-  const [classroomImgFailed, setClassroomImgFailed] = useState(false);
 
   // Simulateur d'Économies
   const [studentCount, setStudentCount] = useState<number>(350);
@@ -622,7 +717,7 @@ export const PublicLandingPage: React.FC<PublicLandingPageProps> = ({
     setTimeout(() => {
       const element = document.getElementById(targetId);
       if (element) {
-        const headerOffset = 88;
+        const headerOffset = 74;
         const elementPosition = element.getBoundingClientRect().top;
         const offsetPosition = elementPosition + window.pageYOffset - headerOffset;
         window.scrollTo({
@@ -648,7 +743,7 @@ export const PublicLandingPage: React.FC<PublicLandingPageProps> = ({
       {/* =========================================================================
           1. EN-TÊTE INSTITUTIONNEL GLASSMORPHISM (1 LIGNE · 3 ZONES)
          ========================================================================= */}
-      <header className="fixed top-0 inset-x-0 z-50 px-3 sm:px-6 lg:px-8 pt-2.5 sm:pt-3 pointer-events-none">
+      <header className="fixed top-0 inset-x-0 z-50 px-3 sm:px-6 lg:px-8 pt-2 sm:pt-2.5 pointer-events-none">
         {/* Barre Principale Glassmorphism — Contrat Strict 3 Zones */}
         <div
           className={`pointer-events-auto max-w-7xl mx-auto px-3.5 sm:px-5 h-14 sm:h-15 flex items-center justify-between gap-4 sm:gap-6 rounded-2xl border transition-all duration-300 backdrop-blur-xl backdrop-saturate-150 ${
@@ -1114,49 +1209,49 @@ export const PublicLandingPage: React.FC<PublicLandingPageProps> = ({
       {/* =========================================================================
           2. CORPS PRINCIPAL — ARCHITECTURE ÉDITORIALE & VITRINE INTERACTIVE
          ========================================================================= */}
-      <main className="pt-20 sm:pt-24 flex-grow">
+      <main className="pt-[4.25rem] sm:pt-[4.75rem] lg:pt-20 flex-grow">
         {/* HERO SECTION — SANS COUPURE DE TITRE + PHOTOGRAPHIE INSTITUTIONNELLE */}
-        <section className="relative pt-8 pb-14 sm:pt-10 sm:pb-16 bg-gradient-to-b from-white via-slate-50/80 to-slate-100/60 border-b border-slate-200/80 overflow-hidden">
+        <section className="relative pt-4 pb-7 sm:pt-5 sm:pb-9 lg:pt-6 lg:pb-10 bg-gradient-to-b from-white via-slate-50/80 to-slate-100/60 border-b border-slate-200/80 overflow-hidden">
           <div
             aria-hidden="true"
             className="pointer-events-none absolute -top-24 right-0 w-[34rem] h-[22rem] bg-[radial-gradient(ellipse_at_center,_rgba(79,70,229,0.08),_transparent_70%)]"
           />
-          <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-10 lg:space-y-12">
+          <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-5 sm:space-y-6 lg:space-y-7">
             {/* Grille Principale 12 Colonnes : Proposition & Photographie */}
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-10 items-stretch">
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 sm:gap-6 lg:gap-8 items-stretch">
               {/* Colonne Texte (7 cols) */}
-              <div className="lg:col-span-7 flex flex-col justify-center space-y-5">
+              <div className="lg:col-span-7 flex flex-col justify-center space-y-3 sm:space-y-3.5">
                 <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-xs font-semibold text-slate-500">
                   <span className="text-indigo-700">République d&apos;Haïti</span>
                   <span className="text-slate-300" aria-hidden="true">·</span>
                   <span>Écoles, Collèges &amp; Universités</span>
                 </div>
 
-                <div className="space-y-3">
-                  <h1 className="text-4xl sm:text-5xl lg:text-[3.5rem] font-extrabold text-slate-900 tracking-tight leading-[1.06] [text-wrap:balance]">
+                <div className="space-y-1.5 sm:space-y-2">
+                  <h1 className="text-3xl sm:text-5xl lg:text-[3.25rem] font-extrabold text-slate-900 tracking-tight leading-[1.06] [text-wrap:balance]">
                     EduNova <span className="text-indigo-700">Pro</span>
                   </h1>
 
                   {/* Intitulé de spécialité & Slogan — Contraste apaisant (WCAG AA/AAA) sans agression visuelle */}
-                  <p className="text-xl sm:text-2xl lg:text-[1.65rem] font-bold text-slate-700 tracking-tight leading-snug [text-wrap:balance]">
+                  <p className="text-lg sm:text-2xl lg:text-[1.55rem] font-bold text-slate-700 tracking-tight leading-snug [text-wrap:balance]">
                     Spécialiste de la Gestion Scolaire, Universitaire et Financière
                   </p>
 
-                  <p className="border-l-2 border-indigo-600 pl-3.5 text-sm sm:text-[15px] font-semibold text-indigo-950/90 tracking-tight">
+                  <p className="border-l-2 border-indigo-600 pl-3 text-sm sm:text-[15px] font-semibold text-indigo-950/90 tracking-tight">
                     « L&apos;Excellence Académique à votre Portée »
                   </p>
                 </div>
 
-                <p className="text-sm sm:text-base text-slate-600 leading-relaxed max-w-2xl">
+                <p className="text-sm sm:text-[15px] text-slate-600 leading-relaxed max-w-2xl">
                   Pilotez sereinement votre établissement grâce à une plateforme conçue pour les réalités du terrain haïtien : encaissements directs <strong className="text-slate-900 font-semibold">MonCash &amp; NatCash</strong>, comptabilité bidevise <strong className="text-slate-900 font-semibold">HTG / USD</strong>, édition instantanée des bulletins et <strong className="text-slate-900 font-semibold">continuité garantie hors-ligne</strong> face aux coupures de courant et d&apos;Internet.
                 </p>
 
                 {/* Hiérarchie CTA claire : 1 Action Dominante + 1 Action Secondaire Sobre */}
-                <div className="flex flex-col sm:flex-row sm:items-center gap-3 pt-1">
+                <div className="flex flex-col sm:flex-row sm:items-center gap-2.5 sm:gap-3 pt-0.5">
                   <button
                     type="button"
                     onClick={() => handleNavigate('demo')}
-                    className="px-6 py-3 bg-indigo-700 hover:bg-indigo-800 active:scale-[0.99] text-white rounded-xl font-bold text-sm transition-all shadow-md shadow-indigo-700/15 cursor-pointer flex items-center justify-center gap-2 whitespace-nowrap shrink-0"
+                    className="px-5 py-2.5 bg-indigo-700 hover:bg-indigo-800 active:scale-[0.99] text-white rounded-xl font-bold text-sm transition-all shadow-md shadow-indigo-700/15 cursor-pointer flex items-center justify-center gap-2 whitespace-nowrap shrink-0"
                   >
                     <span>Planifier une Démo Gratuite</span>
                     <ArrowRight size={16} />
@@ -1166,7 +1261,7 @@ export const PublicLandingPage: React.FC<PublicLandingPageProps> = ({
                     href={`https://wa.me/${contactConfig.whatsappNumber}?text=${encodeURIComponent('Bonjour EduNova Pro, je souhaite planifier une démonstration pour notre établissement.')}`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="px-5 py-3 bg-white hover:bg-slate-50 text-slate-800 border border-slate-300 rounded-xl font-bold text-sm transition-colors cursor-pointer flex items-center justify-center gap-2 whitespace-nowrap shrink-0"
+                    className="px-4 py-2.5 bg-white hover:bg-slate-50 text-slate-800 border border-slate-300 rounded-xl font-bold text-sm transition-colors cursor-pointer flex items-center justify-center gap-2 whitespace-nowrap shrink-0"
                   >
                     <MessageCircle size={16} className="text-emerald-600 shrink-0" />
                     <span>WhatsApp Direct ({contactConfig.whatsappDisplay})</span>
@@ -1174,7 +1269,7 @@ export const PublicLandingPage: React.FC<PublicLandingPageProps> = ({
                 </div>
 
                 {/* Métadonnées de confiance sans capsules */}
-                <div className="pt-2 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-xs font-medium text-slate-500">
+                <div className="pt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs font-medium text-slate-500">
                   <span>Double Monnaie HTG &amp; USD</span>
                   <span className="text-slate-300" aria-hidden="true">·</span>
                   <span>Reçus Certifiés MonCash &amp; NatCash</span>
@@ -1184,47 +1279,29 @@ export const PublicLandingPage: React.FC<PublicLandingPageProps> = ({
               </div>
 
               {/* Colonne Visuelle (5 cols) — Photographie Éditoriale Authentique */}
-              <div className="lg:col-span-5">
-                <div className="relative h-64 sm:h-80 lg:h-full min-h-[280px] rounded-2xl overflow-hidden border border-slate-200/90 shadow-md bg-slate-900">
-                  {!heroImgFailed ? (
-                    <picture className="block w-full h-full">
-                      <source
-                        type="image/avif"
-                        srcSet="/optimized/hero-leadership-480.avif 480w, /optimized/hero-leadership-960.avif 960w, /optimized/hero-leadership-1280.avif 1280w"
-                        sizes="(max-width: 1024px) 100vw, 42vw"
-                      />
-                      <source
-                        type="image/webp"
-                        srcSet="/optimized/hero-leadership-480.webp 480w, /optimized/hero-leadership-960.webp 960w, /optimized/hero-leadership-1280.webp 1280w"
-                        sizes="(max-width: 1024px) 100vw, 42vw"
-                      />
-                      <img
-                        src="/optimized/hero-leadership-960.jpg"
-                        srcSet="/optimized/hero-leadership-480.jpg 480w, /optimized/hero-leadership-960.jpg 960w, /optimized/hero-leadership-1280.jpg 1280w"
-                        sizes="(max-width: 1024px) 100vw, 42vw"
-                        alt="Direction et économat d'un établissement scolaire haïtien pilotant EduNova Pro"
-                        width={960}
-                        height={640}
-                        referrerPolicy="no-referrer"
-                        loading="eager"
-                        decoding="sync"
-                        fetchPriority="high"
-                        onError={() => setHeroImgFailed(true)}
-                        className="w-full h-full object-cover"
-                      />
-                    </picture>
-                  ) : (
-                    <div className="w-full h-full bg-gradient-to-br from-slate-800 via-indigo-950 to-slate-900 flex flex-col items-center justify-center p-6 text-center text-slate-300">
-                      <Building2 size={36} className="text-amber-400 mb-3" />
-                      <span className="text-sm font-bold text-white">Pilotage Intégré Direction &amp; Économat</span>
-                    </div>
-                  )}
-                  <div className="absolute inset-0 bg-gradient-to-t from-slate-950/85 via-slate-950/20 to-transparent" />
-                  <div className="absolute bottom-0 inset-x-0 p-5 text-white space-y-1">
+              <div className="lg:col-span-5 flex">
+                <div className="relative w-full h-52 sm:h-68 lg:h-full min-h-[210px] sm:min-h-[240px] lg:min-h-[260px] rounded-2xl overflow-hidden border border-slate-200/90 shadow-md bg-slate-900">
+                  <LandingSectionImage
+                    slug="hero-leadership"
+                    widths={[480, 960, 1280]}
+                    sizes="(max-width: 1024px) 100vw, 42vw"
+                    alt="Direction et économat d'un établissement scolaire haïtien pilotant EduNova Pro"
+                    width={960}
+                    height={536}
+                    priority="high"
+                    fallback={
+                      <div className="absolute inset-0 w-full h-full bg-gradient-to-br from-slate-800 via-indigo-950 to-slate-900 flex flex-col items-center justify-center p-5 text-center text-slate-300">
+                        <Building2 size={36} className="text-amber-400 mb-2.5" />
+                        <span className="text-sm font-bold text-white">Pilotage Intégré Direction &amp; Économat</span>
+                      </div>
+                    }
+                  />
+                  <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-slate-950/85 via-slate-950/20 to-transparent" />
+                  <div className="absolute bottom-0 inset-x-0 p-3.5 sm:p-4 text-white space-y-0.5">
                     <div className="text-[11px] font-semibold uppercase tracking-wider text-amber-300">
                       Direction &amp; Économat Synchronisés
                     </div>
-                    <p className="text-sm font-bold leading-snug text-white">
+                    <p className="text-xs sm:text-sm font-bold leading-snug text-white">
                       Contrôle complet des inscriptions, encaissements et résultats académiques sur un tableau unifié.
                     </p>
                   </div>
@@ -1234,9 +1311,9 @@ export const PublicLandingPage: React.FC<PublicLandingPageProps> = ({
 
             {/* Vitrine Interactive du Produit (Aperçu Métier Réel) */}
             <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-              <div className="px-4 sm:px-6 py-3 bg-slate-900 text-slate-200 flex flex-wrap items-center justify-between gap-3 border-b border-slate-800">
-                <div className="flex items-center gap-2.5 text-xs font-bold">
-                  <ShieldCheck size={16} className="text-amber-400 shrink-0" />
+              <div className="px-4 sm:px-5 py-2 sm:py-2.5 bg-slate-900 text-slate-200 flex flex-wrap items-center justify-between gap-2.5 border-b border-slate-800">
+                <div className="flex items-center gap-2 text-xs font-bold">
+                  <ShieldCheck size={15} className="text-amber-400 shrink-0" />
                   <span>Aperçu Opérationnel de la Plateforme</span>
                 </div>
                 <span className="text-[11px] font-medium text-slate-400">
@@ -1245,12 +1322,12 @@ export const PublicLandingPage: React.FC<PublicLandingPageProps> = ({
               </div>
 
               {/* Onglets de Démonstration */}
-              <div className="bg-slate-50 px-4 sm:px-6 py-2.5 border-b border-slate-200 flex items-center justify-between gap-4 overflow-x-auto">
+              <div className="bg-slate-50 px-4 sm:px-5 py-2 border-b border-slate-200 flex items-center justify-between gap-3 overflow-x-auto">
                 <div className="flex items-center gap-1.5 p-1 bg-slate-200/70 rounded-lg">
                   <button
                     type="button"
                     onClick={() => setPreviewTab('receipt')}
-                    className={`px-3.5 py-1.5 rounded-md text-xs font-semibold transition-colors whitespace-nowrap shrink-0 cursor-pointer flex items-center gap-1.5 ${
+                    className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-colors whitespace-nowrap shrink-0 cursor-pointer flex items-center gap-1.5 ${
                       previewTab === 'receipt'
                         ? 'bg-white text-slate-950 shadow-2xs font-bold'
                         : 'text-slate-600 hover:text-slate-900'
@@ -1263,7 +1340,7 @@ export const PublicLandingPage: React.FC<PublicLandingPageProps> = ({
                   <button
                     type="button"
                     onClick={() => setPreviewTab('report')}
-                    className={`px-3.5 py-1.5 rounded-md text-xs font-semibold transition-colors whitespace-nowrap shrink-0 cursor-pointer flex items-center gap-1.5 ${
+                    className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-colors whitespace-nowrap shrink-0 cursor-pointer flex items-center gap-1.5 ${
                       previewTab === 'report'
                         ? 'bg-white text-slate-950 shadow-2xs font-bold'
                         : 'text-slate-600 hover:text-slate-900'
@@ -1276,7 +1353,7 @@ export const PublicLandingPage: React.FC<PublicLandingPageProps> = ({
                   <button
                     type="button"
                     onClick={() => setPreviewTab('offline')}
-                    className={`px-3.5 py-1.5 rounded-md text-xs font-semibold transition-colors whitespace-nowrap shrink-0 cursor-pointer flex items-center gap-1.5 ${
+                    className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-colors whitespace-nowrap shrink-0 cursor-pointer flex items-center gap-1.5 ${
                       previewTab === 'offline'
                         ? 'bg-white text-slate-950 shadow-2xs font-bold'
                         : 'text-slate-600 hover:text-slate-900'
@@ -1293,10 +1370,10 @@ export const PublicLandingPage: React.FC<PublicLandingPageProps> = ({
               </div>
 
               {/* Panneau Dynamique */}
-              <div className="p-5 sm:p-7 bg-white">
+              <div className="p-4 sm:p-5 lg:p-6 bg-white">
                 {previewTab === 'receipt' && (
-                  <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-center">
-                    <div className="lg:col-span-7 space-y-2.5">
+                  <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-5 items-center">
+                    <div className="lg:col-span-7 space-y-2">
                       <div className="text-xs font-bold uppercase tracking-wider text-emerald-700">
                         Encaissement Direct · Confirmation Automatique
                       </div>
@@ -1306,7 +1383,7 @@ export const PublicLandingPage: React.FC<PublicLandingPageProps> = ({
                       <p className="text-sm text-slate-600 leading-relaxed">
                         Les parents règlent la scolarité directement depuis leur téléphone. Chaque paiement crédite instantanément le dossier individuel de l&apos;élève, génère un reçu officiel numéroté et alimente le journal de caisse sans aucune saisie manuelle.
                       </p>
-                      <div className="flex flex-wrap items-center gap-x-5 gap-y-1.5 pt-1 text-xs font-semibold text-slate-700">
+                      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 pt-0.5 text-xs font-semibold text-slate-700">
                         <span className="flex items-center gap-1.5">
                           <CheckCircle2 size={14} className="text-emerald-600" />
                           Clôture PDF certifiée
@@ -1322,12 +1399,12 @@ export const PublicLandingPage: React.FC<PublicLandingPageProps> = ({
                       </div>
                     </div>
 
-                    <div className="lg:col-span-5 p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-2.5 text-xs">
-                      <div className="flex justify-between items-center border-b border-slate-200 pb-2">
+                    <div className="lg:col-span-5 p-3.5 sm:p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-2 text-xs">
+                      <div className="flex justify-between items-center border-b border-slate-200 pb-1.5">
                         <span className="font-bold text-slate-900">Reçu Officiel #TRZ-4912</span>
                         <span className="font-mono tabular-nums text-emerald-700 font-bold text-sm">+25 000 HTG</span>
                       </div>
-                      <div className="space-y-1.5 text-slate-600">
+                      <div className="space-y-1 text-slate-600">
                         <div className="flex justify-between">
                           <span>Élève</span>
                           <strong className="text-slate-900">Widlène A. · 7ème AF</strong>
@@ -1341,7 +1418,7 @@ export const PublicLandingPage: React.FC<PublicLandingPageProps> = ({
                           <strong className="text-slate-900">MonCash Direct</strong>
                         </div>
                       </div>
-                      <div className="pt-2 border-t border-slate-200 text-[11px] text-emerald-700 font-mono font-bold flex items-center justify-between">
+                      <div className="pt-1.5 border-t border-slate-200 text-[11px] text-emerald-700 font-mono font-bold flex items-center justify-between">
                         <span>Statut : Validé &amp; Scellé</span>
                         <span>Solde mis à jour</span>
                       </div>
@@ -1350,8 +1427,8 @@ export const PublicLandingPage: React.FC<PublicLandingPageProps> = ({
                 )}
 
                 {previewTab === 'report' && (
-                  <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-center">
-                    <div className="lg:col-span-7 space-y-2.5">
+                  <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-5 items-center">
+                    <div className="lg:col-span-7 space-y-2">
                       <div className="text-xs font-bold uppercase tracking-wider text-indigo-700">
                         Évaluation &amp; Délibération · Édition PDF Haute Résolution
                       </div>
@@ -1361,7 +1438,7 @@ export const PublicLandingPage: React.FC<PublicLandingPageProps> = ({
                       <p className="text-sm text-slate-600 leading-relaxed">
                         Les professeurs saisissent les notes par matière. EduNova Pro applique automatiquement vos coefficients, calcule les moyennes pondérées, classe les élèves par rang de promotion et édite les bulletins de toute la classe prêts pour l&apos;impression.
                       </p>
-                      <div className="flex flex-wrap items-center gap-x-5 gap-y-1.5 pt-1 text-xs font-semibold text-slate-700">
+                      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 pt-0.5 text-xs font-semibold text-slate-700">
                         <span className="flex items-center gap-1.5">
                           <CheckCircle2 size={14} className="text-indigo-600" />
                           Maternelle, Fondamentale &amp; Secondaire
@@ -1373,12 +1450,12 @@ export const PublicLandingPage: React.FC<PublicLandingPageProps> = ({
                       </div>
                     </div>
 
-                    <div className="lg:col-span-5 p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-2.5 text-xs">
-                      <div className="flex justify-between items-center border-b border-slate-200 pb-2">
+                    <div className="lg:col-span-5 p-3.5 sm:p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-2 text-xs">
+                      <div className="flex justify-between items-center border-b border-slate-200 pb-1.5">
                         <span className="font-bold text-slate-900">Bulletin 1ère Période</span>
                         <span className="font-mono tabular-nums text-indigo-700 font-bold text-sm">8.92 / 10</span>
                       </div>
-                      <div className="space-y-1.5 text-slate-600">
+                      <div className="space-y-1 text-slate-600">
                         <div className="flex justify-between">
                           <span>Mathématiques (Coef 4)</span>
                           <strong className="font-mono tabular-nums text-slate-900">88 / 100</strong>
@@ -1392,7 +1469,7 @@ export const PublicLandingPage: React.FC<PublicLandingPageProps> = ({
                           <strong className="text-emerald-700">1er sur 42 élèves</strong>
                         </div>
                       </div>
-                      <div className="pt-2 border-t border-slate-200 text-[11px] text-indigo-700 font-mono font-bold flex items-center justify-between">
+                      <div className="pt-1.5 border-t border-slate-200 text-[11px] text-indigo-700 font-mono font-bold flex items-center justify-between">
                         <span>Mention : Très Bien</span>
                         <span>Impression lot PDF prête</span>
                       </div>
@@ -1401,8 +1478,8 @@ export const PublicLandingPage: React.FC<PublicLandingPageProps> = ({
                 )}
 
                 {previewTab === 'offline' && (
-                  <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-center">
-                    <div className="lg:col-span-7 space-y-2.5">
+                  <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-5 items-center">
+                    <div className="lg:col-span-7 space-y-2">
                       <div className="text-xs font-bold uppercase tracking-wider text-amber-700">
                         Architecture Résiliente · Zones à Faible Connectivité
                       </div>
@@ -1412,7 +1489,7 @@ export const PublicLandingPage: React.FC<PublicLandingPageProps> = ({
                       <p className="text-sm text-slate-600 leading-relaxed">
                         Conçue pour les zones reculées et les réalités électriques d&apos;Haïti : l&apos;application charge en mode léger, enregistre les notes et les reçus de caisse localement de façon chiffrée, puis synchronise automatiquement chaque opération dès le retour du signal.
                       </p>
-                      <div className="flex flex-wrap items-center gap-x-5 gap-y-1.5 pt-1 text-xs font-semibold text-slate-700">
+                      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 pt-0.5 text-xs font-semibold text-slate-700">
                         <span className="flex items-center gap-1.5">
                           <CheckCircle2 size={14} className="text-amber-600" />
                           Base locale sécurisée
@@ -1424,15 +1501,15 @@ export const PublicLandingPage: React.FC<PublicLandingPageProps> = ({
                       </div>
                     </div>
 
-                    <div className="lg:col-span-5 p-4 bg-amber-50/70 rounded-xl border border-amber-200 space-y-2.5 text-xs">
-                      <div className="flex items-center justify-between border-b border-amber-200 pb-2">
+                    <div className="lg:col-span-5 p-3.5 sm:p-4 bg-amber-50/70 rounded-xl border border-amber-200 space-y-2 text-xs">
+                      <div className="flex items-center justify-between border-b border-amber-200 pb-1.5">
                         <span className="font-bold text-amber-950 flex items-center gap-1.5">
                           <RefreshCw size={13} className="text-amber-700" />
                           File de Synchronisation Locale
                         </span>
                         <span className="font-mono text-[11px] font-bold text-emerald-700">Prêt</span>
                       </div>
-                      <div className="space-y-1.5 text-amber-950/85">
+                      <div className="space-y-1 text-amber-950/85">
                         <div className="flex justify-between">
                           <span>Notes saisies hors-ligne</span>
                           <strong className="font-mono tabular-nums">Conservation locale 100%</strong>
@@ -1442,7 +1519,7 @@ export const PublicLandingPage: React.FC<PublicLandingPageProps> = ({
                           <strong className="font-mono tabular-nums">Numérotation séquentielle</strong>
                         </div>
                       </div>
-                      <div className="pt-2 border-t border-amber-200 text-[11px] text-amber-900 font-mono font-bold flex items-center justify-between">
+                      <div className="pt-1.5 border-t border-amber-200 text-[11px] text-amber-900 font-mono font-bold flex items-center justify-between">
                         <span>Reprise réseau automatique</span>
                         <span>Zero-Data-Loss</span>
                       </div>
@@ -1456,30 +1533,30 @@ export const PublicLandingPage: React.FC<PublicLandingPageProps> = ({
 
         {/* BANDEAU DES 4 PILIERS ARCHITECTURAUX */}
         <section className="bg-white border-b border-slate-200">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 lg:divide-x lg:divide-slate-200">
-              <div className="space-y-1 lg:pr-4">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3.5 sm:py-4 lg:py-5">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5 sm:gap-4 lg:gap-5 lg:divide-x lg:divide-slate-200">
+              <div className="space-y-0.5 lg:pr-4">
                 <div className="text-xs font-bold uppercase tracking-wider text-emerald-700">01. Bidevise Natif</div>
                 <div className="text-sm font-extrabold text-slate-900">Comptabilité HTG &amp; USD</div>
                 <p className="text-xs text-slate-600 leading-relaxed">
                   Taux de change configuré par l&apos;établissement avec conversion transparente sur chaque facture.
                 </p>
               </div>
-              <div className="space-y-1 lg:px-6">
+              <div className="space-y-0.5 lg:px-5">
                 <div className="text-xs font-bold uppercase tracking-wider text-indigo-700">02. Paiements Mobiles</div>
                 <div className="text-sm font-extrabold text-slate-900">MonCash &amp; NatCash Directs</div>
                 <p className="text-xs text-slate-600 leading-relaxed">
                   Chaque école reçoit ses fonds sur son propre compte marchand avec rapprochement automatique.
                 </p>
               </div>
-              <div className="space-y-1 lg:px-6">
+              <div className="space-y-0.5 lg:px-5">
                 <div className="text-xs font-bold uppercase tracking-wider text-amber-700">03. Résilience Terrain</div>
                 <div className="text-sm font-extrabold text-slate-900">Fonctionnement Hors-Ligne</div>
                 <p className="text-xs text-slate-600 leading-relaxed">
                   Poursuite des encaissements et de la saisie académique malgré les pannes d&apos;Internet.
                 </p>
               </div>
-              <div className="space-y-1 lg:pl-6">
+              <div className="space-y-0.5 lg:pl-5">
                 <div className="text-xs font-bold uppercase tracking-wider text-slate-700">04. Multi-Niveaux</div>
                 <div className="text-sm font-extrabold text-slate-900">Classique &amp; Universitaire</div>
                 <p className="text-xs text-slate-600 leading-relaxed">
@@ -1491,25 +1568,25 @@ export const PublicLandingPage: React.FC<PublicLandingPageProps> = ({
         </section>
 
         {/* 3. NOS SPÉCIALITÉS D'EXCELLENCE — ARCHITECTURE ASYMÉTRIQUE BENTO */}
-        <section id="specialites" className="scroll-mt-24 py-12 sm:py-16 bg-slate-50">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-8">
-            <div className="max-w-3xl space-y-2">
+        <section id="specialites" className="scroll-mt-18 sm:scroll-mt-20 py-7 sm:py-9 lg:py-10 bg-slate-50">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-5 sm:space-y-6">
+            <div className="max-w-3xl space-y-1.5">
               <div className="text-xs font-bold uppercase tracking-wider text-indigo-700">
                 Architecture Métier &amp; Savoir-Faire
               </div>
               <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-950 tracking-tight [text-wrap:balance]">
                 Nos Spécialités d&apos;Excellence
               </h2>
-              <p className="text-slate-600 text-sm sm:text-base leading-relaxed">
+              <p className="text-slate-600 text-sm sm:text-[15px] leading-relaxed">
                 Chaque module a été pensé avec des directeurs, économes et secrétaires généraux en Haïti pour éliminer les erreurs de caisse, accélérer les délibérations et offrir une visibilité financière irréprochable.
               </p>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-3.5 sm:gap-4">
               {/* Carte Vedette 1 : Économat Bidevise & Encaissements (7 cols) */}
               <div className="lg:col-span-7 bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-2xs grid grid-cols-1 md:grid-cols-12">
-                <div className="md:col-span-7 p-6 flex flex-col justify-between space-y-4">
-                  <div className="space-y-2.5">
+                <div className="md:col-span-7 p-4 sm:p-5 flex flex-col justify-between space-y-3">
+                  <div className="space-y-1.5 sm:space-y-2">
                     <div className="text-xs font-bold uppercase tracking-wider text-emerald-700 flex items-center gap-1.5">
                       <Wallet size={14} />
                       <span>Économat &amp; Trésorerie</span>
@@ -1521,51 +1598,32 @@ export const PublicLandingPage: React.FC<PublicLandingPageProps> = ({
                       Contrôlez chaque gourde et chaque dollar. Le dossier individuel de l&apos;élève affiche exclusivement son contrat personnel et son reste à payer réel, tandis que la Direction dispose d&apos;une vue consolidée et des clôtures PDF quotidiennes.
                     </p>
                   </div>
-                  <div className="pt-3 border-t border-slate-100 flex flex-wrap gap-x-4 gap-y-1 text-xs font-semibold text-emerald-800">
+                  <div className="pt-2.5 border-t border-slate-100 flex flex-wrap gap-x-3.5 gap-y-1 text-xs font-semibold text-emerald-800">
                     <span>✓ Reçus infalsifiables</span>
                     <span>✓ Portefeuille élève dédié</span>
                     <span>✓ Campagnes &amp; Assurance</span>
                   </div>
                 </div>
-                <div className="md:col-span-5 relative min-h-[220px] bg-slate-100">
-                  {!bursarImgFailed ? (
-                    <picture className="block w-full h-full">
-                      <source
-                        type="image/avif"
-                        srcSet="/optimized/bursar-mobile-480.avif 480w, /optimized/bursar-mobile-960.avif 960w"
-                        sizes="(max-width: 768px) 100vw, 32vw"
-                      />
-                      <source
-                        type="image/webp"
-                        srcSet="/optimized/bursar-mobile-480.webp 480w, /optimized/bursar-mobile-960.webp 960w"
-                        sizes="(max-width: 768px) 100vw, 32vw"
-                      />
-                      <img
-                        src="/optimized/bursar-mobile-960.jpg"
-                        srcSet="/optimized/bursar-mobile-480.jpg 480w, /optimized/bursar-mobile-960.jpg 960w"
-                        sizes="(max-width: 768px) 100vw, 32vw"
-                        alt="Confirmation de paiement scolaire mobile et reçu imprimé au guichet"
-                        width={640}
-                        height={427}
-                        referrerPolicy="no-referrer"
-                        loading="lazy"
-                        decoding="async"
-                        fetchPriority="low"
-                        onError={() => setBursarImgFailed(true)}
-                        className="w-full h-full object-cover"
-                      />
-                    </picture>
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center bg-emerald-50 text-emerald-700 p-6">
-                      <Wallet size={36} />
-                    </div>
-                  )}
+                <div className="md:col-span-5 relative aspect-[16/10] sm:aspect-[16/9] md:aspect-auto md:min-h-[195px] lg:min-h-[210px] bg-slate-100">
+                  <LandingSectionImage
+                    slug="bursar-mobile"
+                    widths={[480, 960]}
+                    sizes="(max-width: 768px) 100vw, 32vw"
+                    alt="Confirmation de paiement scolaire mobile et reçu imprimé au guichet"
+                    width={960}
+                    height={717}
+                    fallback={
+                      <div className="absolute inset-0 w-full h-full flex items-center justify-center bg-emerald-50 text-emerald-700 p-5">
+                        <Wallet size={36} />
+                      </div>
+                    }
+                  />
                 </div>
               </div>
 
               {/* Carte Contraste Sombre : Résilience Hors-Ligne (5 cols) */}
-              <div className="lg:col-span-5 bg-[#0B132B] text-slate-100 rounded-2xl border border-slate-800 p-6 flex flex-col justify-between space-y-5 shadow-sm">
-                <div className="space-y-3">
+              <div className="lg:col-span-5 bg-[#0B132B] text-slate-100 rounded-2xl border border-slate-800 p-4 sm:p-5 flex flex-col justify-between space-y-3 shadow-sm">
+                <div className="space-y-2">
                   <div className="text-xs font-bold uppercase tracking-wider text-amber-400 flex items-center gap-1.5">
                     <Zap size={14} />
                     <span>Continuité Sans Faille</span>
@@ -1577,7 +1635,7 @@ export const PublicLandingPage: React.FC<PublicLandingPageProps> = ({
                     Même en zone reculée à faible bande passante ou lors d&apos;une coupure Internet, votre guichet continue d&apos;encaisser et vos professeurs poursuivent la saisie des notes. Dès le retour de la connexion, le système réconcilie les données automatiquement.
                   </p>
                 </div>
-                <div className="pt-3 border-t border-slate-800 space-y-1.5 text-xs text-slate-300 font-medium">
+                <div className="pt-2.5 border-t border-slate-800 space-y-1 text-xs text-slate-300 font-medium">
                   <div className="flex items-center gap-2">
                     <CheckCircle2 size={14} className="text-amber-400 shrink-0" />
                     <span>Chargement ultra-léger adapté aux réseaux mobiles</span>
@@ -1590,8 +1648,8 @@ export const PublicLandingPage: React.FC<PublicLandingPageProps> = ({
               </div>
 
               {/* Carte 3 : Salaires, Vacataires & Pilotage (5 cols) */}
-              <div className="lg:col-span-5 bg-white rounded-2xl border border-slate-200 p-6 flex flex-col justify-between space-y-4 shadow-2xs">
-                <div className="space-y-2.5">
+              <div className="lg:col-span-5 bg-white rounded-2xl border border-slate-200 p-4 sm:p-5 flex flex-col justify-between space-y-3 shadow-2xs">
+                <div className="space-y-1.5 sm:space-y-2">
                   <div className="text-xs font-bold uppercase tracking-wider text-sky-700 flex items-center gap-1.5">
                     <Users size={14} />
                     <span>Ressources Humaines &amp; Direction</span>
@@ -1603,7 +1661,7 @@ export const PublicLandingPage: React.FC<PublicLandingPageProps> = ({
                     Suivez les heures effectuées par vos professeurs vacataires, déduisez automatiquement les avances sur salaire consenties et imprimez les fiches de paie et décharges officielles en quelques secondes.
                   </p>
                 </div>
-                <div className="pt-3 border-t border-slate-100 flex items-center justify-between text-xs font-semibold text-slate-700">
+                <div className="pt-2.5 border-t border-slate-100 flex items-center justify-between text-xs font-semibold text-slate-700">
                   <span className="flex items-center gap-1.5">
                     <BarChart3 size={14} className="text-indigo-600" />
                     Rapports consolidés pour la Direction
@@ -1621,42 +1679,23 @@ export const PublicLandingPage: React.FC<PublicLandingPageProps> = ({
 
               {/* Carte Vedette 4 : Pédagogie, Bulletins & Université (7 cols) */}
               <div className="lg:col-span-7 bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-2xs grid grid-cols-1 md:grid-cols-12">
-                <div className="md:col-span-5 relative min-h-[220px] bg-slate-100 order-2 md:order-1">
-                  {!classroomImgFailed ? (
-                    <picture className="block w-full h-full">
-                      <source
-                        type="image/avif"
-                        srcSet="/optimized/classroom-excellence-480.avif 480w, /optimized/classroom-excellence-960.avif 960w"
-                        sizes="(max-width: 768px) 100vw, 32vw"
-                      />
-                      <source
-                        type="image/webp"
-                        srcSet="/optimized/classroom-excellence-480.webp 480w, /optimized/classroom-excellence-960.webp 960w"
-                        sizes="(max-width: 768px) 100vw, 32vw"
-                      />
-                      <img
-                        src="/optimized/classroom-excellence-960.jpg"
-                        srcSet="/optimized/classroom-excellence-480.jpg 480w, /optimized/classroom-excellence-960.jpg 960w"
-                        sizes="(max-width: 768px) 100vw, 32vw"
-                        alt="Élèves et enseignante en classe travaillant sur les programmes académiques"
-                        width={640}
-                        height={427}
-                        referrerPolicy="no-referrer"
-                        loading="lazy"
-                        decoding="async"
-                        fetchPriority="low"
-                        onError={() => setClassroomImgFailed(true)}
-                        className="w-full h-full object-cover"
-                      />
-                    </picture>
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center bg-indigo-50 text-indigo-700 p-6">
-                      <GraduationCap size={36} />
-                    </div>
-                  )}
+                <div className="md:col-span-5 relative aspect-[16/10] sm:aspect-[16/9] md:aspect-auto md:min-h-[195px] lg:min-h-[210px] bg-slate-100 order-2 md:order-1">
+                  <LandingSectionImage
+                    slug="classroom-excellence"
+                    widths={[480, 960]}
+                    sizes="(max-width: 768px) 100vw, 32vw"
+                    alt="Élèves et enseignante en classe travaillant sur les programmes académiques"
+                    width={960}
+                    height={717}
+                    fallback={
+                      <div className="absolute inset-0 w-full h-full flex items-center justify-center bg-indigo-50 text-indigo-700 p-5">
+                        <GraduationCap size={36} />
+                      </div>
+                    }
+                  />
                 </div>
-                <div className="md:col-span-7 p-6 flex flex-col justify-between space-y-4 order-1 md:order-2">
-                  <div className="space-y-2.5">
+                <div className="md:col-span-7 p-4 sm:p-5 flex flex-col justify-between space-y-3 order-1 md:order-2">
+                  <div className="space-y-1.5 sm:space-y-2">
                     <div className="text-xs font-bold uppercase tracking-wider text-indigo-700 flex items-center gap-1.5">
                       <GraduationCap size={14} />
                       <span>Pédagogie &amp; Enseignement Supérieur</span>
@@ -1668,7 +1707,7 @@ export const PublicLandingPage: React.FC<PublicLandingPageProps> = ({
                       Automatisez le calcul des moyennes, mentions et rangs de promotion. Gérez aussi bien les classes du MENFP (Maternelle au NS IV) que les facultés et instituts techniques avec reprise complète de vos fichiers Excel existants.
                     </p>
                   </div>
-                  <div className="pt-3 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2">
+                  <div className="pt-2.5 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2">
                     <span className="text-xs font-semibold text-indigo-700">✓ Migration Excel &amp; Formation incluses</span>
                     <button
                       type="button"
@@ -1686,9 +1725,9 @@ export const PublicLandingPage: React.FC<PublicLandingPageProps> = ({
         </section>
 
         {/* 4. MODULES MÉTIER INTERACTIFS (4 ONGLETS COMPLETS) */}
-        <section id="modules" className="scroll-mt-24 py-12 sm:py-16 bg-white border-t border-slate-200/80">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6">
-            <div className="text-center max-w-3xl mx-auto space-y-2">
+        <section id="modules" className="scroll-mt-18 sm:scroll-mt-20 py-7 sm:py-9 lg:py-10 bg-white border-t border-slate-200/80">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-4 sm:space-y-5">
+            <div className="text-center max-w-3xl mx-auto space-y-1.5">
               <div className="text-xs font-bold uppercase tracking-wider text-indigo-700">
                 Suite Modulaire Complète
               </div>
@@ -1706,7 +1745,7 @@ export const PublicLandingPage: React.FC<PublicLandingPageProps> = ({
                 <button
                   type="button"
                   onClick={() => setActiveTab('finance')}
-                  className={`px-4 py-2 rounded-lg font-bold text-xs transition-all whitespace-nowrap shrink-0 cursor-pointer flex items-center gap-1.5 ${
+                  className={`px-3.5 sm:px-4 py-2 rounded-lg font-bold text-xs transition-all whitespace-nowrap shrink-0 cursor-pointer flex items-center gap-1.5 ${
                     activeTab === 'finance'
                       ? 'bg-emerald-600 text-white shadow-xs'
                       : 'text-slate-600 hover:text-slate-950 hover:bg-white/60'
@@ -1718,7 +1757,7 @@ export const PublicLandingPage: React.FC<PublicLandingPageProps> = ({
                 <button
                   type="button"
                   onClick={() => setActiveTab('academic')}
-                  className={`px-4 py-2 rounded-lg font-bold text-xs transition-all whitespace-nowrap shrink-0 cursor-pointer flex items-center gap-1.5 ${
+                  className={`px-3.5 sm:px-4 py-2 rounded-lg font-bold text-xs transition-all whitespace-nowrap shrink-0 cursor-pointer flex items-center gap-1.5 ${
                     activeTab === 'academic'
                       ? 'bg-indigo-600 text-white shadow-xs'
                       : 'text-slate-600 hover:text-slate-950 hover:bg-white/60'
@@ -1730,7 +1769,7 @@ export const PublicLandingPage: React.FC<PublicLandingPageProps> = ({
                 <button
                   type="button"
                   onClick={() => setActiveTab('payroll')}
-                  className={`px-4 py-2 rounded-lg font-bold text-xs transition-all whitespace-nowrap shrink-0 cursor-pointer flex items-center gap-1.5 ${
+                  className={`px-3.5 sm:px-4 py-2 rounded-lg font-bold text-xs transition-all whitespace-nowrap shrink-0 cursor-pointer flex items-center gap-1.5 ${
                     activeTab === 'payroll'
                       ? 'bg-amber-600 text-white shadow-xs'
                       : 'text-slate-600 hover:text-slate-950 hover:bg-white/60'
@@ -1742,7 +1781,7 @@ export const PublicLandingPage: React.FC<PublicLandingPageProps> = ({
                 <button
                   type="button"
                   onClick={() => setActiveTab('parents')}
-                  className={`px-4 py-2 rounded-lg font-bold text-xs transition-all whitespace-nowrap shrink-0 cursor-pointer flex items-center gap-1.5 ${
+                  className={`px-3.5 sm:px-4 py-2 rounded-lg font-bold text-xs transition-all whitespace-nowrap shrink-0 cursor-pointer flex items-center gap-1.5 ${
                     activeTab === 'parents'
                       ? 'bg-slate-900 text-white shadow-xs'
                       : 'text-slate-600 hover:text-slate-950 hover:bg-white/60'
@@ -1755,20 +1794,20 @@ export const PublicLandingPage: React.FC<PublicLandingPageProps> = ({
             </div>
 
             {/* Contenu du Module Actif */}
-            <div className="bg-slate-50 rounded-2xl p-5 sm:p-8 border border-slate-200">
+            <div className="bg-slate-50 rounded-2xl p-4 sm:p-5 lg:p-6 border border-slate-200">
               {activeTab === 'finance' && (
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-center">
-                  <div className="space-y-3">
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-5 items-center">
+                  <div className="space-y-2">
                     <div className="text-xs font-bold uppercase tracking-wider text-emerald-700">
                       Économat &amp; Caisses
                     </div>
-                    <h3 className="text-xl font-extrabold text-slate-950">
+                    <h3 className="text-lg sm:text-xl font-extrabold text-slate-950">
                       Gestion Financière Transparente, Bidevise et Auditée
                     </h3>
                     <p className="text-slate-600 text-sm leading-relaxed">
                       Chaque encaissement génère un reçu thermique ou A4 numéroté. Le solde de l&apos;élève est actualisé en direct au guichet ou via les paiements mobiles MonCash / NatCash, avec isolation stricte de la trésorerie de chaque école.
                     </p>
-                    <ul className="space-y-2 text-xs sm:text-sm text-slate-700 pt-1">
+                    <ul className="space-y-1.5 text-xs sm:text-sm text-slate-700 pt-0.5">
                       <li className="flex items-center gap-2">
                         <CheckCircle2 size={15} className="text-emerald-600 shrink-0" />
                         <span>Clôture quotidienne de caisse avec export PDF certifié</span>
@@ -1784,19 +1823,19 @@ export const PublicLandingPage: React.FC<PublicLandingPageProps> = ({
                     </ul>
                   </div>
 
-                  <div className="p-4 sm:p-5 rounded-xl bg-white border border-slate-200 space-y-2.5">
-                    <div className="flex justify-between items-center text-xs font-bold text-slate-500 border-b border-slate-100 pb-2">
+                  <div className="p-3.5 sm:p-4 rounded-xl bg-white border border-slate-200 space-y-2">
+                    <div className="flex justify-between items-center text-xs font-bold text-slate-500 border-b border-slate-100 pb-1.5">
                       <span>Derniers Règlements Certifiés</span>
                       <span className="text-emerald-700 font-mono">HTG &amp; USD</span>
                     </div>
-                    <div className="p-3 bg-slate-50 rounded-lg border border-slate-200/80 flex justify-between items-center text-xs">
+                    <div className="p-2.5 bg-slate-50 rounded-lg border border-slate-200/80 flex justify-between items-center text-xs">
                       <div>
                         <div className="font-bold text-slate-900">MonCash Direct · Reçu #4812</div>
                         <div className="text-slate-500 text-[11px]">Woodley A. · Terminale</div>
                       </div>
                       <div className="font-bold text-emerald-700 font-mono tabular-nums">+15 000 HTG</div>
                     </div>
-                    <div className="p-3 bg-slate-50 rounded-lg border border-slate-200/80 flex justify-between items-center text-xs">
+                    <div className="p-2.5 bg-slate-50 rounded-lg border border-slate-200/80 flex justify-between items-center text-xs">
                       <div>
                         <div className="font-bold text-slate-900">NatCash Direct · Reçu #4813</div>
                         <div className="text-slate-500 text-[11px]">Samantha D. · 9ème AF</div>
@@ -1808,18 +1847,18 @@ export const PublicLandingPage: React.FC<PublicLandingPageProps> = ({
               )}
 
               {activeTab === 'academic' && (
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-center">
-                  <div className="space-y-3">
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-5 items-center">
+                  <div className="space-y-2">
                     <div className="text-xs font-bold uppercase tracking-wider text-indigo-700">
                       Pédagogie &amp; Bulletins
                     </div>
-                    <h3 className="text-xl font-extrabold text-slate-950">
+                    <h3 className="text-lg sm:text-xl font-extrabold text-slate-950">
                       Bulletins Périodiques, Relevés &amp; Dossiers Scolaires Complets
                     </h3>
                     <p className="text-slate-600 text-sm leading-relaxed">
                       Saisie unique des notes par matière : calcul instantané des coefficients, moyennes trimestrielles, rangs de classe et palmarès complets, avec suivi des pièces justificatives d&apos;admission et présences.
                     </p>
-                    <ul className="space-y-2 text-xs sm:text-sm text-slate-700 pt-1">
+                    <ul className="space-y-1.5 text-xs sm:text-sm text-slate-700 pt-0.5">
                       <li className="flex items-center gap-2">
                         <CheckCircle2 size={15} className="text-indigo-600 shrink-0" />
                         <span>Fondamentale, Secondaire, Universités et Facultés (LMD)</span>
@@ -1835,12 +1874,12 @@ export const PublicLandingPage: React.FC<PublicLandingPageProps> = ({
                     </ul>
                   </div>
 
-                  <div className="p-4 sm:p-5 rounded-xl bg-white border border-slate-200 space-y-2.5 text-xs">
-                    <div className="font-bold text-slate-900 pb-2 border-b border-slate-100 flex justify-between">
+                  <div className="p-3.5 sm:p-4 rounded-xl bg-white border border-slate-200 space-y-2 text-xs">
+                    <div className="font-bold text-slate-900 pb-1.5 border-b border-slate-100 flex justify-between">
                       <span>Bulletin 1ère Période · Exemple</span>
                       <span className="text-indigo-700 font-mono tabular-nums">Moyenne : 8.75 / 10</span>
                     </div>
-                    <div className="space-y-2">
+                    <div className="space-y-1.5">
                       <div className="flex justify-between p-2.5 bg-slate-50 rounded-lg border border-slate-200/80">
                         <span className="font-medium text-slate-700">Mathématiques (Coef 4)</span>
                         <span className="font-mono tabular-nums font-bold text-slate-900">86 / 100</span>
@@ -1859,18 +1898,18 @@ export const PublicLandingPage: React.FC<PublicLandingPageProps> = ({
               )}
 
               {activeTab === 'payroll' && (
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-center">
-                  <div className="space-y-3">
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-5 items-center">
+                  <div className="space-y-2">
                     <div className="text-xs font-bold uppercase tracking-wider text-amber-700">
                       Salaires &amp; RH
                     </div>
-                    <h3 className="text-xl font-extrabold text-slate-950">
+                    <h3 className="text-lg sm:text-xl font-extrabold text-slate-950">
                       Gestion Salariale Claire pour Titulaires et Vacataires
                     </h3>
                     <p className="text-slate-600 text-sm leading-relaxed">
                       Calcul automatique des salaires mensuels, pointage des heures réelles effectuées par les professeurs vacataires et retenue transparente des avances sur salaire accordées.
                     </p>
-                    <ul className="space-y-2 text-xs sm:text-sm text-slate-700 pt-1">
+                    <ul className="space-y-1.5 text-xs sm:text-sm text-slate-700 pt-0.5">
                       <li className="flex items-center gap-2">
                         <CheckCircle2 size={15} className="text-amber-600 shrink-0" />
                         <span>Fiches de paie et décharges imprimables en PDF</span>
@@ -1886,8 +1925,8 @@ export const PublicLandingPage: React.FC<PublicLandingPageProps> = ({
                     </ul>
                   </div>
 
-                  <div className="p-4 sm:p-5 rounded-xl bg-white border border-slate-200 space-y-2 text-xs">
-                    <div className="font-bold text-slate-900 pb-2 border-b border-slate-100 flex justify-between">
+                  <div className="p-3.5 sm:p-4 rounded-xl bg-white border border-slate-200 space-y-1.5 text-xs">
+                    <div className="font-bold text-slate-900 pb-1.5 border-b border-slate-100 flex justify-between">
                       <span>Fiche Enseignant</span>
                       <span className="text-amber-700 font-mono tabular-nums">Vacataire · 48h</span>
                     </div>
@@ -1908,18 +1947,18 @@ export const PublicLandingPage: React.FC<PublicLandingPageProps> = ({
               )}
 
               {activeTab === 'parents' && (
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-center">
-                  <div className="space-y-3">
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-5 items-center">
+                  <div className="space-y-2">
                     <div className="text-xs font-bold uppercase tracking-wider text-slate-700">
                       Relation Familles &amp; Élèves
                     </div>
-                    <h3 className="text-xl font-extrabold text-slate-950">
+                    <h3 className="text-lg sm:text-xl font-extrabold text-slate-950">
                       Portail Parents &amp; Étudiants Accessible sur Smartphone
                     </h3>
                     <p className="text-slate-600 text-sm leading-relaxed">
                       Offrez aux parents et étudiants un accès sécurisé pour consulter l&apos;évolution des notes, vérifier leur relevé financier personnel exact et régler les frais scolaires à distance sans file d&apos;attente.
                     </p>
-                    <ul className="space-y-2 text-xs sm:text-sm text-slate-700 pt-1">
+                    <ul className="space-y-1.5 text-xs sm:text-sm text-slate-700 pt-0.5">
                       <li className="flex items-center gap-2">
                         <CheckCircle2 size={15} className="text-indigo-600 shrink-0" />
                         <span>Consultation des bulletins, présences et emplois du temps</span>
@@ -1935,8 +1974,8 @@ export const PublicLandingPage: React.FC<PublicLandingPageProps> = ({
                     </ul>
                   </div>
 
-                  <div className="p-4 sm:p-5 rounded-xl bg-white border border-slate-200 space-y-2.5 text-xs">
-                    <div className="font-bold text-slate-900 pb-2 border-b border-slate-100 flex justify-between">
+                  <div className="p-3.5 sm:p-4 rounded-xl bg-white border border-slate-200 space-y-1.5 text-xs">
+                    <div className="font-bold text-slate-900 pb-1.5 border-b border-slate-100 flex justify-between">
                       <span>Vue Famille · Dossier Individuel</span>
                       <span className="text-indigo-700 font-semibold">Synchronisé</span>
                     </div>
@@ -1960,9 +1999,9 @@ export const PublicLandingPage: React.FC<PublicLandingPageProps> = ({
         </section>
 
         {/* 5. SIMULATEUR D'ÉCONOMIES ANNUELLES */}
-        <section id="roi" className="scroll-mt-24 py-12 sm:py-16 bg-slate-50 border-t border-slate-200/80">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-8">
-            <div className="text-center max-w-3xl mx-auto space-y-2">
+        <section id="roi" className="scroll-mt-18 sm:scroll-mt-20 py-7 sm:py-9 lg:py-10 bg-slate-50 border-t border-slate-200/80">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-4 sm:space-y-5 lg:space-y-6">
+            <div className="text-center max-w-3xl mx-auto space-y-1.5">
               <div className="text-xs font-bold uppercase tracking-wider text-emerald-700 flex items-center justify-center gap-1.5">
                 <Calculator size={14} />
                 <span>Calculateur Prévisionnel</span>
@@ -1975,10 +2014,10 @@ export const PublicLandingPage: React.FC<PublicLandingPageProps> = ({
               </p>
             </div>
 
-            <div className="max-w-4xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-6 bg-white p-5 sm:p-7 rounded-2xl border border-slate-200 shadow-2xs">
+            <div className="max-w-4xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-5 bg-white p-4 sm:p-5 lg:p-6 rounded-2xl border border-slate-200 shadow-2xs">
               {/* Sliders */}
-              <div className="space-y-5 flex flex-col justify-center">
-                <div className="space-y-1.5">
+              <div className="space-y-3.5 sm:space-y-4 flex flex-col justify-center">
+                <div className="space-y-1">
                   <div className="flex justify-between items-center text-xs">
                     <span className="font-bold text-slate-800">Effectif de l&apos;Établissement</span>
                     <span className="font-mono tabular-nums font-bold text-indigo-700 text-sm">{studentCount} élèves</span>
@@ -1999,7 +2038,7 @@ export const PublicLandingPage: React.FC<PublicLandingPageProps> = ({
                   </div>
                 </div>
 
-                <div className="space-y-1.5">
+                <div className="space-y-1">
                   <div className="flex justify-between items-center text-xs">
                     <span className="font-bold text-slate-800">Scolarité Annuelle Moyenne</span>
                     <span className="font-mono tabular-nums font-bold text-emerald-700 text-sm">
@@ -2022,7 +2061,7 @@ export const PublicLandingPage: React.FC<PublicLandingPageProps> = ({
                   </div>
                 </div>
 
-                <div className="space-y-1.5">
+                <div className="space-y-1">
                   <div className="flex justify-between items-center text-xs">
                     <span className="font-bold text-slate-800">Taux Moyen de Retard de Paiement</span>
                     <span className="font-mono tabular-nums font-bold text-rose-700 text-sm">{unpaidRate}%</span>
@@ -2045,8 +2084,8 @@ export const PublicLandingPage: React.FC<PublicLandingPageProps> = ({
               </div>
 
               {/* Résultats */}
-              <div className="bg-slate-50 p-5 rounded-xl border border-slate-200 flex flex-col justify-between space-y-4">
-                <div className="space-y-3">
+              <div className="bg-slate-50 p-4 sm:p-5 rounded-xl border border-slate-200 flex flex-col justify-between space-y-3">
+                <div className="space-y-2">
                   <div className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
                     Impact Financier Projeté
                   </div>
@@ -2058,7 +2097,7 @@ export const PublicLandingPage: React.FC<PublicLandingPageProps> = ({
                     </div>
                   </div>
 
-                  <div className="pt-3 border-t border-slate-200 space-y-1">
+                  <div className="pt-2 border-t border-slate-200 space-y-1">
                     <span className="text-xs text-emerald-700 font-bold flex items-center gap-1.5">
                       <TrendingUp size={14} /> Recouvrement Optimisé avec EduNova Pro :
                     </span>
@@ -2071,7 +2110,7 @@ export const PublicLandingPage: React.FC<PublicLandingPageProps> = ({
                     </p>
                   </div>
 
-                  <div className="pt-2.5 border-t border-slate-200 flex items-center justify-between text-xs text-slate-700">
+                  <div className="pt-2 border-t border-slate-200 flex items-center justify-between text-xs text-slate-700">
                     <span>Temps administratif économisé :</span>
                     <span className="font-mono tabular-nums font-bold text-indigo-700">
                       +{hoursSavedPerMonth}h / mois
@@ -2093,9 +2132,9 @@ export const PublicLandingPage: React.FC<PublicLandingPageProps> = ({
         </section>
 
         {/* 6. TÉMOIGNAGES DES DIRECTEURS & ÉCONOMES */}
-        <section id="testimonials" className="scroll-mt-24 py-12 sm:py-16 bg-white border-t border-slate-200/80">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-8">
-            <div className="text-center max-w-3xl mx-auto space-y-2">
+        <section id="testimonials" className="scroll-mt-18 sm:scroll-mt-20 py-7 sm:py-9 lg:py-10 bg-white border-t border-slate-200/80">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-4 sm:space-y-5 lg:space-y-6">
+            <div className="text-center max-w-3xl mx-auto space-y-1.5">
               <div className="text-xs font-bold uppercase tracking-wider text-indigo-700">
                 Retours Terrain
               </div>
@@ -2107,9 +2146,9 @@ export const PublicLandingPage: React.FC<PublicLandingPageProps> = ({
               </p>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-              <article className="bg-slate-50 p-6 rounded-2xl border border-slate-200 flex flex-col justify-between space-y-4">
-                <div className="space-y-3">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5 sm:gap-4">
+              <article className="bg-slate-50 p-4 sm:p-5 rounded-2xl border border-slate-200 flex flex-col justify-between space-y-3">
+                <div className="space-y-2">
                   <div className="flex items-center justify-between text-xs">
                     <span className="font-bold text-emerald-700">Encaissements Mobiles</span>
                     <div className="flex text-amber-500 gap-0.5" aria-label="Note 5 sur 5">
@@ -2125,14 +2164,14 @@ export const PublicLandingPage: React.FC<PublicLandingPageProps> = ({
                     Résultat : +85% de recouvrement ponctuel
                   </div>
                 </div>
-                <div className="pt-4 border-t border-slate-200 text-xs">
+                <div className="pt-2.5 sm:pt-3 border-t border-slate-200 text-xs">
                   <div className="font-bold text-slate-950">Direction Pédagogique</div>
                   <div className="text-slate-500">Institution Privée · Port-au-Prince</div>
                 </div>
               </article>
 
-              <article className="bg-slate-50 p-6 rounded-2xl border border-slate-200 flex flex-col justify-between space-y-4">
-                <div className="space-y-3">
+              <article className="bg-slate-50 p-4 sm:p-5 rounded-2xl border border-slate-200 flex flex-col justify-between space-y-3">
+                <div className="space-y-2">
                   <div className="flex items-center justify-between text-xs">
                     <span className="font-bold text-indigo-700">Économat Bidevise</span>
                     <div className="flex text-amber-500 gap-0.5" aria-label="Note 5 sur 5">
@@ -2148,14 +2187,14 @@ export const PublicLandingPage: React.FC<PublicLandingPageProps> = ({
                     Résultat : Clôtures certifiées chaque soir
                   </div>
                 </div>
-                <div className="pt-4 border-t border-slate-200 text-xs">
+                <div className="pt-2.5 sm:pt-3 border-t border-slate-200 text-xs">
                   <div className="font-bold text-slate-950">Économe Principal</div>
                   <div className="text-slate-500">Collège Newton · Pétion-Ville</div>
                 </div>
               </article>
 
-              <article className="bg-slate-50 p-6 rounded-2xl border border-slate-200 flex flex-col justify-between space-y-4">
-                <div className="space-y-3">
+              <article className="bg-slate-50 p-4 sm:p-5 rounded-2xl border border-slate-200 flex flex-col justify-between space-y-3">
+                <div className="space-y-2">
                   <div className="flex items-center justify-between text-xs">
                     <span className="font-bold text-amber-700">Continuité Hors-Ligne</span>
                     <div className="flex text-amber-500 gap-0.5" aria-label="Note 5 sur 5">
@@ -2171,7 +2210,7 @@ export const PublicLandingPage: React.FC<PublicLandingPageProps> = ({
                     Résultat : Zéro arrêt de service administratif
                   </div>
                 </div>
-                <div className="pt-4 border-t border-slate-200 text-xs">
+                <div className="pt-2.5 sm:pt-3 border-t border-slate-200 text-xs">
                   <div className="font-bold text-slate-950">Secrétariat Général</div>
                   <div className="text-slate-500">Institut Supérieur · Cap-Haïtien</div>
                 </div>
@@ -2181,48 +2220,48 @@ export const PublicLandingPage: React.FC<PublicLandingPageProps> = ({
         </section>
 
         {/* 7. MISE EN SERVICE CLÉ EN MAIN & FORMULAIRE DE DÉMO */}
-        <section id="demo" className="scroll-mt-24 py-12 sm:py-16 bg-slate-50 border-t border-slate-200/80">
+        <section id="demo" className="scroll-mt-18 sm:scroll-mt-20 py-7 sm:py-9 lg:py-10 bg-slate-50 border-t border-slate-200/80">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-stretch bg-white rounded-2xl border border-slate-200 p-6 sm:p-8 shadow-xs">
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 lg:gap-6 items-stretch bg-white rounded-2xl border border-slate-200 p-4 sm:p-5 lg:p-6 shadow-xs">
               {/* Colonne Engagements d'Accompagnement */}
-              <div className="lg:col-span-5 flex flex-col justify-between space-y-6 bg-[#0B132B] text-slate-100 rounded-xl p-6">
-                <div className="space-y-3">
+              <div className="lg:col-span-5 flex flex-col justify-between space-y-4 bg-[#0B132B] text-slate-100 rounded-xl p-4 sm:p-5">
+                <div className="space-y-2">
                   <div className="text-xs font-bold uppercase tracking-wider text-amber-400">
                     Déploiement Clé en Main
                   </div>
-                  <h2 className="text-2xl font-extrabold text-white tracking-tight [text-wrap:balance]">
+                  <h2 className="text-xl sm:text-2xl font-extrabold text-white tracking-tight [text-wrap:balance]">
                     Planifiez votre Démo EduNova Pro
                   </h2>
                   <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
                     Notre équipe configure la plateforme aux couleurs, classes et barèmes HTG/USD de votre établissement avant votre mise en production.
                   </p>
 
-                  <ul className="space-y-3 pt-2 text-xs text-slate-200">
-                    <li className="flex items-start gap-2.5">
-                      <FileCheck2 size={16} className="text-amber-400 shrink-0 mt-0.5" />
+                  <ul className="space-y-2 pt-1 text-xs text-slate-200">
+                    <li className="flex items-start gap-2">
+                      <FileCheck2 size={15} className="text-amber-400 shrink-0 mt-0.5" />
                       <span>Reprise et importation soignée de vos listes d&apos;élèves et anciens soldes Excel</span>
                     </li>
-                    <li className="flex items-start gap-2.5">
-                      <Layers size={16} className="text-emerald-400 shrink-0 mt-0.5" />
+                    <li className="flex items-start gap-2">
+                      <Layers size={15} className="text-emerald-400 shrink-0 mt-0.5" />
                       <span>Activation des passerelles de paiement propres à votre établissement</span>
                     </li>
-                    <li className="flex items-start gap-2.5">
-                      <BookOpen size={16} className="text-indigo-400 shrink-0 mt-0.5" />
+                    <li className="flex items-start gap-2">
+                      <BookOpen size={15} className="text-indigo-400 shrink-0 mt-0.5" />
                       <span>Formation pratique du directeur, de l&apos;économe et du secrétariat</span>
                     </li>
                   </ul>
                 </div>
 
-                <div className="pt-4 border-t border-slate-800 space-y-3 text-xs">
+                <div className="pt-3 border-t border-slate-800 space-y-2 text-xs">
                   <div className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
                     Canaux Officiels de Réception
                   </div>
-                  <div className="space-y-2">
+                  <div className="space-y-1.5">
                     <a
                       href={`https://wa.me/${contactConfig.whatsappNumber}?text=${encodeURIComponent('Bonjour EduNova Pro, je souhaite planifier une démonstration pour notre établissement.')}`}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="flex items-center justify-between p-2.5 rounded-lg bg-slate-900/90 border border-slate-800 hover:border-emerald-500/50 transition-colors group"
+                      className="flex items-center justify-between p-2 sm:p-2.5 rounded-lg bg-slate-900/90 border border-slate-800 hover:border-emerald-500/50 transition-colors group"
                     >
                       <span className="flex items-center gap-2 text-slate-300">
                         <MessageCircle size={14} className="text-emerald-400 shrink-0" />
@@ -2235,7 +2274,7 @@ export const PublicLandingPage: React.FC<PublicLandingPageProps> = ({
 
                     <a
                       href={`mailto:${contactConfig.displayEmail}?subject=${encodeURIComponent('Demande de Démonstration EduNova Pro')}`}
-                      className="flex items-center justify-between p-2.5 rounded-lg bg-slate-900/90 border border-slate-800 hover:border-amber-400/50 transition-colors group gap-2"
+                      className="flex items-center justify-between p-2 sm:p-2.5 rounded-lg bg-slate-900/90 border border-slate-800 hover:border-amber-400/50 transition-colors group gap-2"
                     >
                       <span className="flex items-center gap-2 text-slate-300 shrink-0">
                         <Mail size={14} className="text-amber-400 shrink-0" />
@@ -2246,7 +2285,7 @@ export const PublicLandingPage: React.FC<PublicLandingPageProps> = ({
                       </span>
                     </a>
 
-                    <div className="flex items-center justify-between px-2.5 py-1 text-[11px] text-slate-400">
+                    <div className="flex items-center justify-between px-2 py-0.5 text-[11px] text-slate-400">
                       <span>Ligne Secrétariat Port-au-Prince</span>
                       <span className="font-mono text-slate-200 font-semibold">+509 {contactConfig.secondaryPhoneDisplay}</span>
                     </div>
@@ -2260,16 +2299,16 @@ export const PublicLandingPage: React.FC<PublicLandingPageProps> = ({
                   <div
                     role="status"
                     aria-live="polite"
-                    className="py-6 sm:py-7 px-5 sm:px-6 space-y-5 bg-emerald-50/70 rounded-xl border-2 border-emerald-300 shadow-xs"
+                    className="py-4 sm:py-5 px-4 sm:px-5 space-y-3.5 bg-emerald-50/70 rounded-xl border-2 border-emerald-300 shadow-xs"
                   >
-                    <div className="text-center space-y-2.5">
-                      <div className="w-12 h-12 rounded-full bg-emerald-600 text-white flex items-center justify-center mx-auto shadow-sm">
-                        <CheckCircle2 size={26} />
+                    <div className="text-center space-y-2">
+                      <div className="w-11 h-11 rounded-full bg-emerald-600 text-white flex items-center justify-center mx-auto shadow-sm">
+                        <CheckCircle2 size={24} />
                       </div>
                       <div className="inline-block px-3 py-1 rounded-full bg-white border border-emerald-200 text-[11px] font-mono font-bold text-emerald-800 uppercase tracking-wider">
                         Demande Confirmée · Réf. {submissionResult.referenceCode}
                       </div>
-                      <h3 className="text-xl font-extrabold text-slate-950">
+                      <h3 className="text-lg sm:text-xl font-extrabold text-slate-950">
                         Merci {submissionResult.contactName} ! Votre demande de démo est confirmée.
                       </h3>
                       <p className="text-slate-700 text-xs sm:text-sm max-w-lg mx-auto leading-relaxed">
@@ -2278,7 +2317,7 @@ export const PublicLandingPage: React.FC<PublicLandingPageProps> = ({
                     </div>
 
                     {/* Détail transparent des canaux de réception */}
-                    <div className="bg-white rounded-xl border border-slate-200 p-4 space-y-2.5 text-xs">
+                    <div className="bg-white rounded-xl border border-slate-200 p-3.5 space-y-2 text-xs">
                       <div className="flex items-center justify-between gap-2">
                         <span className="flex items-center gap-2 font-semibold text-slate-800">
                           <CheckCircle2 size={14} className="text-emerald-600 shrink-0" />
@@ -2368,11 +2407,11 @@ export const PublicLandingPage: React.FC<PublicLandingPageProps> = ({
                     </div>
                   </div>
                 ) : (
-                  <form onSubmit={handleDemoSubmit} noValidate className="space-y-4">
+                  <form onSubmit={handleDemoSubmit} noValidate className="space-y-3">
                     {submitError && (
                       <div
                         role="alert"
-                        className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs font-semibold flex items-start gap-2"
+                        className="p-2.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs font-semibold flex items-start gap-2"
                       >
                         <AlertCircle size={15} className="text-rose-600 shrink-0 mt-0.5" />
                         <span>{submitError}</span>
@@ -2390,7 +2429,7 @@ export const PublicLandingPage: React.FC<PublicLandingPageProps> = ({
                       className="hidden"
                     />
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 sm:gap-3">
                       <div className="space-y-1">
                         <label htmlFor="demo-school-name" className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
                           <Building2 size={13} className="text-indigo-600" />
@@ -2413,7 +2452,7 @@ export const PublicLandingPage: React.FC<PublicLandingPageProps> = ({
                             handleDemoFieldChange('schoolName', val);
                           }}
                           onBlur={() => handleDemoFieldBlur('schoolName')}
-                          className={`w-full px-3.5 py-2.5 bg-white border rounded-lg text-slate-900 text-xs focus:outline-none focus:ring-2 transition-colors ${
+                          className={`w-full px-3.5 py-2.5 sm:py-2 bg-white border rounded-lg text-slate-900 text-xs focus:outline-none focus:ring-2 transition-colors ${
                             fieldErrors.schoolName
                               ? 'border-rose-400 focus:ring-rose-500/20 focus:border-rose-500'
                               : 'border-slate-300 focus:ring-indigo-500/30 focus:border-indigo-600'
@@ -2449,7 +2488,7 @@ export const PublicLandingPage: React.FC<PublicLandingPageProps> = ({
                             handleDemoFieldChange('contactName', val);
                           }}
                           onBlur={() => handleDemoFieldBlur('contactName')}
-                          className={`w-full px-3.5 py-2.5 bg-white border rounded-lg text-slate-900 text-xs focus:outline-none focus:ring-2 transition-colors ${
+                          className={`w-full px-3.5 py-2.5 sm:py-2 bg-white border rounded-lg text-slate-900 text-xs focus:outline-none focus:ring-2 transition-colors ${
                             fieldErrors.contactName
                               ? 'border-rose-400 focus:ring-rose-500/20 focus:border-rose-500'
                               : 'border-slate-300 focus:ring-indigo-500/30 focus:border-indigo-600'
@@ -2485,7 +2524,7 @@ export const PublicLandingPage: React.FC<PublicLandingPageProps> = ({
                             handleDemoFieldChange('phone', val);
                           }}
                           onBlur={() => handleDemoFieldBlur('phone')}
-                          className={`w-full px-3.5 py-2.5 bg-white border rounded-lg text-slate-900 text-xs focus:outline-none focus:ring-2 transition-colors ${
+                          className={`w-full px-3.5 py-2.5 sm:py-2 bg-white border rounded-lg text-slate-900 text-xs focus:outline-none focus:ring-2 transition-colors ${
                             fieldErrors.phone
                               ? 'border-rose-400 focus:ring-rose-500/20 focus:border-rose-500'
                               : 'border-slate-300 focus:ring-indigo-500/30 focus:border-indigo-600'
@@ -2523,7 +2562,7 @@ export const PublicLandingPage: React.FC<PublicLandingPageProps> = ({
                             handleDemoFieldChange('email', val);
                           }}
                           onBlur={() => handleDemoFieldBlur('email')}
-                          className={`w-full px-3.5 py-2.5 bg-white border rounded-lg text-slate-900 text-xs focus:outline-none focus:ring-2 transition-colors ${
+                          className={`w-full px-3.5 py-2.5 sm:py-2 bg-white border rounded-lg text-slate-900 text-xs focus:outline-none focus:ring-2 transition-colors ${
                             fieldErrors.email
                               ? 'border-rose-400 focus:ring-rose-500/20 focus:border-rose-500'
                               : 'border-slate-300 focus:ring-indigo-500/30 focus:border-indigo-600'
@@ -2545,7 +2584,7 @@ export const PublicLandingPage: React.FC<PublicLandingPageProps> = ({
                         <select
                           value={city}
                           onChange={(e) => setCity(e.target.value)}
-                          className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-lg text-slate-900 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-600 transition-colors cursor-pointer"
+                          className="w-full px-3.5 py-2.5 sm:py-2 bg-white border border-slate-300 rounded-lg text-slate-900 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-600 transition-colors cursor-pointer"
                         >
                           <option value="Port-au-Prince">Port-au-Prince</option>
                           <option value="Pétion-Ville">Pétion-Ville</option>
@@ -2569,7 +2608,7 @@ export const PublicLandingPage: React.FC<PublicLandingPageProps> = ({
                         <select
                           value={schoolType}
                           onChange={(e) => setSchoolType(e.target.value)}
-                          className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-lg text-slate-900 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-600 transition-colors cursor-pointer"
+                          className="w-full px-3.5 py-2.5 sm:py-2 bg-white border border-slate-300 rounded-lg text-slate-900 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-600 transition-colors cursor-pointer"
                         >
                           <option value="Fondamentale & Secondaire">Fondamentale &amp; Secondaire (Classique)</option>
                           <option value="Maternelle & Primaire">Maternelle &amp; Primaire</option>
@@ -2587,7 +2626,7 @@ export const PublicLandingPage: React.FC<PublicLandingPageProps> = ({
                         <select
                           value={studentBracket}
                           onChange={(e) => setStudentBracket(e.target.value)}
-                          className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-lg text-slate-900 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-600 transition-colors cursor-pointer"
+                          className="w-full px-3.5 py-2.5 sm:py-2 bg-white border border-slate-300 rounded-lg text-slate-900 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-600 transition-colors cursor-pointer"
                         >
                           <option value="Moins de 150">Moins de 150 élèves</option>
                           <option value="150-350">150 à 350 élèves</option>
@@ -2624,7 +2663,7 @@ export const PublicLandingPage: React.FC<PublicLandingPageProps> = ({
                               });
                             }
                           }}
-                          className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-lg text-slate-900 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-600 transition-colors cursor-pointer"
+                          className="w-full px-3.5 py-2.5 sm:py-2 bg-white border border-slate-300 rounded-lg text-slate-900 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-600 transition-colors cursor-pointer"
                         >
                           <option value="both">Email &amp; WhatsApp (Recommandé)</option>
                           <option value="whatsapp">WhatsApp Direct ({contactConfig.whatsappDisplay})</option>
@@ -2676,7 +2715,7 @@ export const PublicLandingPage: React.FC<PublicLandingPageProps> = ({
                     <button
                       type="submit"
                       disabled={isSubmitting}
-                      className="w-full py-3 px-5 bg-indigo-600 hover:bg-indigo-700 active:scale-[0.99] text-white rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 shadow-sm"
+                      className="w-full py-2.5 px-5 bg-indigo-600 hover:bg-indigo-700 active:scale-[0.99] text-white rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 shadow-sm"
                     >
                       {isSubmitting ? (
                         <span>Transmission de votre demande...</span>
@@ -2688,7 +2727,7 @@ export const PublicLandingPage: React.FC<PublicLandingPageProps> = ({
                       )}
                     </button>
 
-                    <div className="pt-2 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs">
+                    <div className="pt-1.5 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs">
                       <span className="text-slate-500">
                         Réception sur <strong className="text-slate-700">{contactConfig.displayEmail}</strong> ou WhatsApp :
                       </span>
@@ -2716,11 +2755,11 @@ export const PublicLandingPage: React.FC<PublicLandingPageProps> = ({
       {/* =========================================================================
           3. PIED DE PAGE INSTITUTIONNEL ÉPURÉ
          ========================================================================= */}
-      <footer className="bg-[#070D1E] text-slate-300 border-t border-slate-800/80 pt-12 pb-8 text-xs">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-8">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 lg:gap-10">
+      <footer className="bg-[#070D1E] text-slate-300 border-t border-slate-800/80 pt-7 pb-5 sm:pt-8 sm:pb-6 text-xs">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-5 sm:space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5 sm:gap-6 lg:gap-8">
             {/* Colonne 1 : Identité */}
-            <div className="space-y-3.5">
+            <div className="space-y-2.5">
               <div className="flex items-center gap-3">
                 <div className="p-2 bg-slate-900 rounded-xl border border-slate-800 flex items-center justify-center">
                   <Logo size="sm" className="w-8 h-8" />
@@ -2780,11 +2819,11 @@ export const PublicLandingPage: React.FC<PublicLandingPageProps> = ({
             </div>
 
             {/* Colonne 2 : Domaines & Solutions Métier */}
-            <div className="space-y-3">
+            <div className="space-y-2.5">
               <h4 className="text-xs font-bold uppercase tracking-wider text-amber-400">
                 Domaines &amp; Modules
               </h4>
-              <ul className="space-y-2 text-slate-400 text-xs">
+              <ul className="space-y-1.5 text-slate-400 text-xs">
                 <li>
                   <button
                     type="button"
@@ -2834,11 +2873,11 @@ export const PublicLandingPage: React.FC<PublicLandingPageProps> = ({
             </div>
 
             {/* Colonne 3 : Services & Accompagnement */}
-            <div className="space-y-3">
+            <div className="space-y-2.5">
               <h4 className="text-xs font-bold uppercase tracking-wider text-amber-400">
                 Services &amp; Déploiement
               </h4>
-              <ul className="space-y-2 text-slate-400 text-xs">
+              <ul className="space-y-1.5 text-slate-400 text-xs">
                 <li>
                   <button
                     type="button"
@@ -2879,11 +2918,11 @@ export const PublicLandingPage: React.FC<PublicLandingPageProps> = ({
             </div>
 
             {/* Colonne 4 : Secrétariat & Contact */}
-            <div className="space-y-3.5">
+            <div className="space-y-2.5">
               <h4 className="text-xs font-bold uppercase tracking-wider text-amber-400">
                 Secrétariat &amp; Contact
               </h4>
-              <div className="space-y-3 text-slate-300 text-xs">
+              <div className="space-y-2 text-slate-300 text-xs">
                 <div className="flex items-start gap-2.5">
                   <MapPin size={15} className="text-amber-400 shrink-0 mt-0.5" />
                   <div>
@@ -2922,7 +2961,7 @@ export const PublicLandingPage: React.FC<PublicLandingPageProps> = ({
             </div>
           </div>
 
-          <div className="pt-6 border-t border-slate-800/80 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-400">
+          <div className="pt-4 border-t border-slate-800/80 flex flex-col sm:flex-row items-center justify-between gap-2.5 text-xs text-slate-400">
             <div>© 2026 EduNova Pro · Tous droits réservés · République d&apos;Haïti</div>
             <div className="flex items-center gap-5">
               <button
@@ -2957,7 +2996,7 @@ export const PublicLandingPage: React.FC<PublicLandingPageProps> = ({
       </footer>
 
       {/* Boutons Flottants Sobres (WhatsApp & Retour en Haut) */}
-      <div className="fixed bottom-5 right-5 z-40 flex flex-col items-center gap-2.5">
+      <div className="fixed bottom-4 right-4 sm:bottom-5 sm:right-5 z-40 flex flex-col items-center gap-2">
         {scrolled && (
           <button
             type="button"

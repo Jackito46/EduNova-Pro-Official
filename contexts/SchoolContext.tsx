@@ -28,10 +28,35 @@ export const SchoolProvider: React.FC<{ user: UserProfile | null, schoolId: stri
     (user?.role as any) === 'SUPER_ADMIN'
   );
 
-  const [school, setSchool] = useState<School | null>(null);
-  const [campuses, setCampuses] = useState<SchoolCampus[]>([]);
-  const [activeAcademicYear, setActiveAcademicYear] = useState<AcademicYear | null>(null);
-  const [globalModules, setGlobalModules] = useState<string[]>(['finance', 'exams', 'attendance', 'inventory']);
+  const [school, setSchool] = useState<School | null>(() => {
+    if (!schoolId) return null;
+    try {
+      const cached = localStorage.getItem(`edunova_cached_school_${schoolId}`);
+      return cached ? JSON.parse(cached) : null;
+    } catch { return null; }
+  });
+  const [campuses, setCampuses] = useState<SchoolCampus[]>(() => {
+    if (!schoolId) return [];
+    try {
+      const cached = localStorage.getItem(`edunova_cached_campuses_${schoolId}`);
+      return cached ? JSON.parse(cached) : [];
+    } catch { return []; }
+  });
+  const [activeAcademicYear, setActiveAcademicYear] = useState<AcademicYear | null>(() => {
+    if (!schoolId) return null;
+    try {
+      const cached = localStorage.getItem(`edunova_cached_active_year_${schoolId}`);
+      return cached ? JSON.parse(cached) : null;
+    } catch { return null; }
+  });
+  const [globalModules, setGlobalModules] = useState<string[]>(() => {
+    try {
+      const cached = localStorage.getItem('edunova_cached_global_modules');
+      const parsed = cached ? JSON.parse(cached) : null;
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+    } catch {}
+    return ['finance', 'exams', 'attendance', 'inventory'];
+  });
   const [currentCampusId, setCurrentCampusIdState] = useState<string | null>(() => {
     try {
       if (user && user.campus_id && !isSuperUser) {
@@ -44,7 +69,7 @@ export const SchoolProvider: React.FC<{ user: UserProfile | null, schoolId: stri
       return null;
     }
   });
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(() => !school);
 
   // Strictly enforce user's campus for non-super-user annexe admins
   useEffect(() => {
@@ -58,13 +83,21 @@ export const SchoolProvider: React.FC<{ user: UserProfile | null, schoolId: stri
     return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
   };
 
+  const withQuickRace = <T,>(promise: PromiseLike<T>, ms = 4500): Promise<T> => {
+    let tid: ReturnType<typeof setTimeout>;
+    const timeout = new Promise<never>((_, reject) => {
+      tid = setTimeout(() => reject(new Error('SchoolContext timeout')), ms);
+    });
+    return Promise.race([Promise.resolve(promise), timeout]).finally(() => clearTimeout(tid));
+  };
+
   const fetchSchool = async () => {
     if (!schoolId || !isValidUuid(schoolId)) {
       setLoading(false);
       return;
     }
 
-    // Attempt to load from localStorage cache first for low-bandwidth/offline support
+    // Hydrate from localStorage cache immediately
     const cacheKey = `edunova_cached_school_${schoolId}`;
     try {
       const cached = localStorage.getItem(cacheKey);
@@ -76,9 +109,14 @@ export const SchoolProvider: React.FC<{ user: UserProfile | null, schoolId: stri
       console.warn("School cache read error:", e);
     }
 
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      setLoading(false);
+      return;
+    }
+
     // Guard: Only fetch from Supabase if we have an active authenticated session
     try {
-      const { data: { session } } = await supabase.auth.getSession();
+      const { data: { session } } = await withQuickRace(supabase.auth.getSession(), 2500);
       if (!session) {
         setLoading(false);
         return;
@@ -89,11 +127,10 @@ export const SchoolProvider: React.FC<{ user: UserProfile | null, schoolId: stri
     }
 
     try {
-      const { data, error } = await supabase
-        .from('schools')
-        .select('*')
-        .eq('id', schoolId)
-        .single();
+      const { data, error } = await withQuickRace(
+        supabase.from('schools').select('*').eq('id', schoolId).single(),
+        5000
+      );
 
       if (error) throw error;
       if (data) {
@@ -106,6 +143,7 @@ export const SchoolProvider: React.FC<{ user: UserProfile | null, schoolId: stri
       const isNetworkError = 
         err?.message === 'Failed to fetch' || 
         err?.message?.includes('Erreur réseau') || 
+        err?.message?.includes('timeout') ||
         err?.code === 'NETWORK_ERROR' ||
         err?.status === 503;
         
@@ -136,20 +174,27 @@ export const SchoolProvider: React.FC<{ user: UserProfile | null, schoolId: stri
       console.warn("Campuses cache read error:", e);
     }
 
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      return;
+    }
+
     // Guard: Only fetch from Supabase if we have an active authenticated session
     try {
-      const { data: { session } } = await supabase.auth.getSession();
+      const { data: { session } } = await withQuickRace(supabase.auth.getSession(), 2500);
       if (!session) return;
     } catch (e) {
       return;
     }
 
     try {
-      const { data, error } = await supabase
-        .from('school_campuses')
-        .select('*')
-        .eq('school_id', schoolId)
-        .order('name', { ascending: true });
+      const { data, error } = await withQuickRace(
+        supabase
+          .from('school_campuses')
+          .select('*')
+          .eq('school_id', schoolId)
+          .order('name', { ascending: true }),
+        5000
+      );
 
       if (error) throw error;
       
@@ -181,8 +226,6 @@ export const SchoolProvider: React.FC<{ user: UserProfile | null, schoolId: stri
         );
         const targetDefaultId = siegeSocial ? siegeSocial.id : sortedCampuses[0].id;
 
-        const isVilWilson = user?.email?.toLowerCase() === 'vilinfo2014@gmail.com';
-
         if (user?.campus_id) {
           if (currentCampusId !== user.campus_id) {
             handleSetCampusId(user.campus_id);
@@ -193,13 +236,10 @@ export const SchoolProvider: React.FC<{ user: UserProfile | null, schoolId: stri
             handleSetCampusId(targetDefaultId);
           }
         } else {
-          // Global admin! On first login/session (no currentCampusId and no valid saved preference), 
-          // default them to their first available exact campus/annexe instead of "Vue Globale" (null).
-          // This positions the principal admin in their exact first campus.
+          // Global admin! Position in first available campus if none selected
           if (!currentCampusId && !isValidSaved) {
             handleSetCampusId(targetDefaultId);
           } else if (currentCampusId) {
-            // Validate existing campus selection
             const exists = sortedCampuses.some((c: SchoolCampus) => c.id === currentCampusId);
             if (!exists) {
               handleSetCampusId(targetDefaultId);
@@ -211,6 +251,7 @@ export const SchoolProvider: React.FC<{ user: UserProfile | null, schoolId: stri
       const isNetworkError = 
         err?.message === 'Failed to fetch' || 
         err?.message?.includes('Erreur réseau') || 
+        err?.message?.includes('timeout') ||
         err?.code === 'NETWORK_ERROR' ||
         err?.status === 503;
         
@@ -241,19 +282,41 @@ export const SchoolProvider: React.FC<{ user: UserProfile | null, schoolId: stri
 
   const fetchActiveAcademicYear = async () => {
     if (!schoolId) return;
+    const activeCacheKey = `edunova_cached_active_year_${schoolId}`;
+    const yearsCacheKey = `edunova_cached_years_${schoolId}`;
+
+    // Instant hydration from cache
     try {
-      const { data: yearsData, error } = await supabase
-        .from('academic_years')
-        .select('*')
-        .eq('school_id', schoolId)
-        .order('created_at', { ascending: false });
+      const cached = localStorage.getItem(activeCacheKey);
+      if (cached) {
+        setActiveAcademicYear(JSON.parse(cached));
+      }
+    } catch {}
+
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      return;
+    }
+
+    try {
+      const { data: yearsData, error } = await withQuickRace(
+        supabase
+          .from('academic_years')
+          .select('*')
+          .eq('school_id', schoolId)
+          .order('created_at', { ascending: false }),
+        5000
+      );
         
       if (error) throw error;
       
       if (!yearsData || yearsData.length === 0) {
-        setActiveAcademicYear(null);
         return;
       }
+
+      try {
+        localStorage.setItem(yearsCacheKey, JSON.stringify(yearsData));
+        localStorage.setItem(`edunova_has_session_${schoolId}`, 'true');
+      } catch {}
 
       // Priority 1: Check if a session is explicitly marked ACTIVE or is_active in DB for this school
       let dbActive = yearsData.find(y => y.status === 'ACTIVE' || y.is_active === true);
@@ -264,25 +327,38 @@ export const SchoolProvider: React.FC<{ user: UserProfile | null, schoolId: stri
       }
       
       setActiveAcademicYear(dbActive || null);
+      if (dbActive) {
+        try {
+          localStorage.setItem(activeCacheKey, JSON.stringify(dbActive));
+        } catch {}
+      }
 
     } catch (e) {
-      console.warn("Failed to fetch active academic year", e);
+      console.warn("Failed to fetch active academic year (cache preserved)", e);
     }
   };
 
   const fetchGlobalModules = useCallback(async () => {
+    if (typeof navigator !== 'undefined' && !navigator.onLine) return;
     try {
-      const { data, error } = await supabase
-        .from('global_settings')
-        .select('key, value')
-        .eq('key', 'modules_config')
-        .maybeSingle();
+      const { data, error } = await withQuickRace(
+        supabase
+          .from('global_settings')
+          .select('key, value')
+          .eq('key', 'modules_config')
+          .maybeSingle(),
+        4500
+      );
 
       if (!error && data && data.value && Array.isArray((data.value as any).enabled_modules)) {
-        setGlobalModules((data.value as any).enabled_modules);
+        const mods = (data.value as any).enabled_modules;
+        setGlobalModules(mods);
+        try {
+          localStorage.setItem('edunova_cached_global_modules', JSON.stringify(mods));
+        } catch {}
       }
     } catch (e) {
-      console.warn("Failed to fetch global modules config", e);
+      console.warn("Failed to fetch global modules config (cache preserved)", e);
     }
   }, []);
 
@@ -291,15 +367,13 @@ export const SchoolProvider: React.FC<{ user: UserProfile | null, schoolId: stri
     const normalizedId = moduleId === 'presences' ? 'attendance' : moduleId;
 
     // 1. Global killswitch check:
-    // Any module must be explicitly present in globalModules array to be considered active.
-    // If unchecked (absent from the array), it is disabled globally.
     if (globalModules && Array.isArray(globalModules)) {
       if (!globalModules.includes(normalizedId)) {
         return false;
       }
     }
 
-    // 2. School-level override check (if school has configured specific modules)
+    // 2. School-level override check
     const schoolModules = (school as any)?.global_settings?.modules;
     if (schoolModules && typeof schoolModules === 'object') {
       if (normalizedId === 'attendance' && schoolModules.presences === false) {
@@ -325,6 +399,9 @@ export const SchoolProvider: React.FC<{ user: UserProfile | null, schoolId: stri
   }, [globalModules, school]);
 
   useEffect(() => {
+    // Failsafe guarantee: loading never stays true past 1.5s
+    const safetyTimer = setTimeout(() => setLoading(false), 1500);
+
     fetchSchool();
     fetchCampuses();
     fetchActiveAcademicYear();
@@ -334,6 +411,9 @@ export const SchoolProvider: React.FC<{ user: UserProfile | null, schoolId: stri
     const handleCustomModulesUpdate = (e: CustomEvent) => {
       if (e.detail && Array.isArray(e.detail.enabled_modules)) {
         setGlobalModules(e.detail.enabled_modules);
+        try {
+          localStorage.setItem('edunova_cached_global_modules', JSON.stringify(e.detail.enabled_modules));
+        } catch {}
       } else {
         fetchGlobalModules();
       }
@@ -356,10 +436,17 @@ export const SchoolProvider: React.FC<{ user: UserProfile | null, schoolId: stri
       )
       .subscribe();
 
-    // Robustly recover from initial session loading race conditions by listening to auth state changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+    // Refresh when regaining connectivity or auth changes
+    const handleReconnect = () => {
+      fetchSchool();
+      fetchCampuses();
+      fetchActiveAcademicYear();
+      fetchGlobalModules();
+    };
+    window.addEventListener('online', handleReconnect);
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       if (session) {
-        console.log(`SchoolContext: Auth event [${event}] triggered data refresh.`);
         fetchSchool();
         fetchCampuses();
         fetchActiveAcademicYear();
@@ -368,6 +455,8 @@ export const SchoolProvider: React.FC<{ user: UserProfile | null, schoolId: stri
     });
 
     return () => {
+      clearTimeout(safetyTimer);
+      window.removeEventListener('online', handleReconnect);
       window.removeEventListener('edunova_modules_config_updated' as any, handleCustomModulesUpdate);
       supabase.removeChannel(channel);
       subscription.unsubscribe();

@@ -61,6 +61,8 @@ import { LogoutConfirmModal } from './LogoutConfirmModal';
 import { useSchool } from '../contexts/SchoolContext';
 import Logo from './Logo';
 import { usePwaInstall } from '../hooks/usePwaInstall';
+import { useOnlineStatus } from '../hooks/useOnlineStatus';
+import { prefetchRouteChunk } from '../utils/routePrefetch';
 
 import { toast } from 'sonner';
 
@@ -91,6 +93,9 @@ const SidebarNavLink = React.memo<SidebarNavLinkProps>(({ item, isSubItem = fals
             : 'px-2.5 min-h-[40px] text-[13.5px]'
       }`}
       onClick={onNavigate}
+      onMouseEnter={() => prefetchRouteChunk(item.path)}
+      onFocus={() => prefetchRouteChunk(item.path)}
+      onTouchStart={() => prefetchRouteChunk(item.path)}
       title={item.name}
     >
       <div className={`relative z-10 flex items-center gap-2 w-full min-w-0 ${isNarrow ? 'justify-center' : ''}`}>
@@ -172,6 +177,7 @@ const Sidebar: React.FC<SidebarProps> = ({ user, onLogout }) => {
   );
 
   const { isInstallable, isInstalled, installPwa } = usePwaInstall();
+  const { isOnline, isSlow } = useOnlineStatus();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [isLogoutModalOpen, setIsLogoutModalOpen] = useState(false);
   const [isChangePasswordModalOpen, setIsChangePasswordModalOpen] = useState(false);
@@ -330,9 +336,20 @@ const Sidebar: React.FC<SidebarProps> = ({ user, onLogout }) => {
                 <div className={`${isNarrow ? 'w-9 h-9 p-1 rounded-xl' : 'w-10 h-10 sm:w-11 sm:h-11 p-1.5 rounded-2xl'} bg-white shadow-xs border border-slate-200/90 flex items-center justify-center overflow-hidden`}>
                   <Logo src={schoolInfo.logo_url || "/logo.png"} size="sm" className="w-full h-full object-contain rounded-xl" />
                 </div>
-                <span className="absolute -bottom-0.5 -right-0.5 flex h-2.5 w-2.5">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-60"></span>
-                  <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500 border-2 border-white"></span>
+                <span
+                  className="absolute -bottom-0.5 -right-0.5 flex h-2.5 w-2.5"
+                  title={!isOnline ? 'Mode hors-ligne actif' : isSlow ? 'Connexion instable / lente' : 'Connecté au Cloud'}
+                >
+                  <span
+                    className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-60 ${
+                      !isOnline ? 'bg-rose-400' : isSlow ? 'bg-amber-400' : 'bg-emerald-400'
+                    }`}
+                  />
+                  <span
+                    className={`relative inline-flex rounded-full h-2.5 w-2.5 border-2 border-white ${
+                      !isOnline ? 'bg-rose-500' : isSlow ? 'bg-amber-500' : 'bg-emerald-500'
+                    }`}
+                  />
                 </span>
               </div>
 

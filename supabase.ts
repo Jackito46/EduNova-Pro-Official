@@ -376,38 +376,148 @@ if (!supabaseUrl || !supabaseUrl.startsWith('http')) {
   console.error("CRITICAL: VITE_SUPABASE_URL est invalide ou manquante. L'application ne pourra pas se connecter à la base de données.");
 }
 
-// Safe global fetch wrapper that catches network errors, retries transient failures, and returns structured 503 responses
-const safeFetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
-  const maxRetries = 2;
-  for (let attempt = 0; attempt <= maxRetries; attempt++) {
-    let reqInit = init;
-    let timeoutId: any = null;
-    if (!init?.signal) {
-      const controller = new AbortController();
-      timeoutId = setTimeout(() => controller.abort(), 25000); // 25s request timeout guard
-      reqInit = { ...init, signal: controller.signal };
+let lastNetworkFailureAt = 0;
+let lastSuccessEmitAt = 0;
+
+export const emitNetworkStatus = (detail: { online: boolean; latencyMs?: number; reason?: string }) => {
+  if (typeof window === 'undefined') return;
+  try {
+    if (!detail.online) {
+      lastNetworkFailureAt = Date.now();
+    } else {
+      const now = Date.now();
+      // Throttle healthy status events unless recovering from a recent failure
+      if (lastNetworkFailureAt === 0 && now - lastSuccessEmitAt < 5000) {
+        return;
+      }
+      if (lastNetworkFailureAt > 0) {
+        lastNetworkFailureAt = 0;
+      }
+      lastSuccessEmitAt = now;
     }
+    window.dispatchEvent(new CustomEvent('edunova_network_status', { detail }));
+  } catch {}
+};
+
+export const isNetworkOrTimeoutError = (err: any): boolean => {
+  if (!err) return false;
+  if (typeof navigator !== 'undefined' && !navigator.onLine) return true;
+  const code = String(err?.code || '').toUpperCase();
+  const status = Number(err?.status || err?.statusCode || 0);
+  const name = String(err?.name || '');
+  const msg = String(err?.message || err || '').toLowerCase();
+  return (
+    code === 'NETWORK_ERROR' ||
+    status === 503 ||
+    name === 'AbortError' ||
+    msg.includes('failed to fetch') ||
+    msg.includes('erreur réseau') ||
+    msg.includes('network') ||
+    msg.includes('timeout') ||
+    msg.includes('timed out') ||
+    msg.includes('abort') ||
+    msg.includes('load failed') ||
+    msg.includes('service unavailable')
+  );
+};
+
+export const withTimeout = async <T>(
+  promise: PromiseLike<T>,
+  ms: number = 8000,
+  label: string = 'Timeout'
+): Promise<T> => {
+  let timeoutId: ReturnType<typeof setTimeout> | undefined;
+  const timeoutPromise = new Promise<never>((_, reject) => {
+    timeoutId = setTimeout(() => {
+      const err: any = new Error(`Timeout (${ms}ms): ${label}`);
+      err.code = 'NETWORK_ERROR';
+      err.name = 'AbortError';
+      reject(err);
+    }, ms);
+  });
+  try {
+    return await Promise.race([Promise.resolve(promise), timeoutPromise]);
+  } finally {
+    if (timeoutId !== undefined) clearTimeout(timeoutId);
+  }
+};
+
+// Safe global fetch wrapper: fails fast when offline, prevents 75s+ timeout cascades, emits live network health events
+const safeFetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+  if (typeof navigator !== 'undefined' && !navigator.onLine) {
+    emitNetworkStatus({ online: false, reason: 'navigator-offline' });
+    return new Response(JSON.stringify({
+      message: "Erreur réseau: Mode hors-ligne actif.",
+      code: "NETWORK_ERROR"
+    }), {
+      status: 503,
+      statusText: "Service Unavailable",
+      headers: { 'Content-Type': 'application/json' }
+    });
+  }
+
+  const urlStr = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+  const method = (init?.method || 'GET').toUpperCase();
+  const isIdempotent = method === 'GET' || method === 'HEAD';
+  const isHeavyEndpoint = urlStr.includes('/storage/v1/') || urlStr.includes('/functions/v1/') || urlStr.includes('/rpc/');
+  const recentlyUnstable = lastNetworkFailureAt > 0 && (Date.now() - lastNetworkFailureAt) < 10000;
+  const timeoutMs = isHeavyEndpoint ? 16000 : (recentlyUnstable ? 5500 : 9000);
+  const maxRetries = isIdempotent && !recentlyUnstable ? 1 : 0;
+
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    if (init?.signal?.aborted) {
+      throw new DOMException('The operation was aborted.', 'AbortError');
+    }
+
+    const controller = new AbortController();
+    let timeoutId: ReturnType<typeof setTimeout> | undefined;
+    let onCallerAbort: (() => void) | undefined;
+
+    if (init?.signal) {
+      onCallerAbort = () => controller.abort();
+      init.signal.addEventListener('abort', onCallerAbort, { once: true });
+    }
+    timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+    const startedAt = Date.now();
     try {
-      const response = await fetch(input, reqInit);
-      if (timeoutId) clearTimeout(timeoutId);
+      const response = await fetch(input, { ...init, signal: controller.signal });
+      if (timeoutId !== undefined) clearTimeout(timeoutId);
+      if (onCallerAbort && init?.signal) init.signal.removeEventListener('abort', onCallerAbort);
+
+      const latencyMs = Date.now() - startedAt;
+      if (response.status !== 503) {
+        emitNetworkStatus({ online: true, latencyMs });
+      }
       return response;
     } catch (err: any) {
-      if (timeoutId) clearTimeout(timeoutId);
-      const isNetworkError = 
-        err.name === 'AbortError' ||
-        err.message === 'Failed to fetch' || 
-        err.name === 'TypeError' || 
-        (err.message && err.message.toLowerCase().includes('fetch'));
-        
-      if (isNetworkError && attempt < maxRetries) {
-        // Wait briefly before retrying transient network glitches with exponential backoff
-        await new Promise(r => setTimeout(r, 500 * Math.pow(2, attempt)));
+      if (timeoutId !== undefined) clearTimeout(timeoutId);
+      if (onCallerAbort && init?.signal) init.signal.removeEventListener('abort', onCallerAbort);
+
+      // If caller aborted explicitly, rethrow without masking
+      if (init?.signal?.aborted) {
+        throw err;
+      }
+
+      const elapsed = Date.now() - startedAt;
+      const isNetworkError =
+        err?.name === 'AbortError' ||
+        err?.message === 'Failed to fetch' ||
+        err?.name === 'TypeError' ||
+        Boolean(err?.message && err.message.toLowerCase().includes('fetch'));
+
+      // Retry ONLY once on fast idempotent glitches (< 2.2s); never chain two full timeouts together
+      if (isNetworkError && attempt < maxRetries && elapsed < 2200 && (typeof navigator === 'undefined' || navigator.onLine)) {
+        await new Promise(r => setTimeout(r, 300));
         continue;
       }
 
       if (isNetworkError) {
+        emitNetworkStatus({ online: false, latencyMs: elapsed, reason: err?.name === 'AbortError' ? 'timeout' : 'fetch-error' });
         return new Response(JSON.stringify({
-          message: "Erreur réseau: Impossible de contacter le serveur de base de données. Vérifiez votre connexion internet.",
+          message: err?.name === 'AbortError'
+            ? "Erreur réseau: Délai d'attente dépassé (connexion instable)."
+            : "Erreur réseau: Impossible de contacter le serveur de base de données.",
           code: "NETWORK_ERROR"
         }), {
           status: 503,
@@ -418,6 +528,7 @@ const safeFetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<
       throw err;
     }
   }
+
   return new Response(JSON.stringify({
     message: "Erreur réseau: Serveur indisponible.",
     code: "NETWORK_ERROR"

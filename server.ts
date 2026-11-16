@@ -7633,9 +7633,20 @@ async function startServer() {
       }
     }));
 
-    // Protection anti-blocage : Si un asset compilé (/assets/*) est introuvable après un nouveau build,
-    // NE JAMAIS renvoyer index.html. Renvoyer un 404 strict pour permettre au client de détecter la mise à jour et recharger proprement.
-    app.all(/^\/assets\/.*/, (req, res) => {
+    // Repli sécurisé vers public/optimized en production si dist/optimized est absent
+    const publicOptimizedPath = path.join(process.cwd(), 'public', 'optimized');
+    if (fs.existsSync(publicOptimizedPath)) {
+      app.use('/optimized', express.static(publicOptimizedPath, {
+        setHeaders: (res) => {
+          res.setHeader('Access-Control-Allow-Origin', '*');
+          res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+        }
+      }));
+    }
+
+    // Protection anti-blocage : Si un asset compilé (/assets/* ou /optimized/*) est introuvable,
+    // NE JAMAIS renvoyer index.html. Renvoyer un 404 strict.
+    app.all(/^\/(assets|optimized)\/.*/, (req, res) => {
       res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate, max-age=0');
       res.setHeader('Pragma', 'no-cache');
       res.setHeader('Expires', '0');
