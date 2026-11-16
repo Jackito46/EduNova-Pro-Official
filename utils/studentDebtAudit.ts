@@ -115,6 +115,11 @@ export async function computeCertifiedStudentArrears({
     return { totalArrears: 0, sessions: [], source: 'CLIENT_AUDIT' };
   }
 
+  const safeFallbackRate =
+    Number.isFinite(Number(exchangeRateFallback)) && Number(exchangeRateFallback) > 1
+      ? Number(exchangeRateFallback)
+      : 135;
+
   try {
     // Offline fast guard
     if (typeof navigator !== 'undefined' && !navigator.onLine) {
@@ -145,31 +150,28 @@ export async function computeCertifiedStudentArrears({
 
     effectiveSchoolId = effectiveSchoolId || studentData.school_id;
 
-    // 2. Charger en parallèle toutes les données comptables de l'élève pour cet établissement
-    const [yearsRes, enrollmentsRes, paymentsRes, adHocRes, rateRes] = await withTimeout(
+    // 2. Charger en parallèle toutes les données comptables via select('*') pour éviter toute erreur de colonne manquante selon les schémas d'école
+    const [yearsRes, enrollmentsPrimaryRes, paymentsPrimaryRes, adHocPrimaryRes, rateRes] = await withTimeout(
       Promise.all([
         supabase
           .from('academic_years')
-          .select('id, label, status, is_active, created_at')
+          .select('*')
           .eq('school_id', effectiveSchoolId),
         supabase
           .from('enrollments')
-          .select('id, class_id, academic_year_id, tuition_discount, tuition_addition, created_at, academic_year:academic_years(id, label, status, is_active, created_at), class:classes(id, name, level)')
-          .eq('student_id', studentId)
-          .eq('school_id', effectiveSchoolId),
+          .select('*, academic_year:academic_years(*), class:classes(*)')
+          .eq('student_id', studentId),
         supabase
           .from('payments')
-          .select('id, student_id, school_id, academic_year_id, fee_type, type, nature, description, amount, rawAmount:amount, amount_htg_equivalent, amount_usd_equivalent, currency, exchange_rate_applied, status, payment_method, ad_hoc_campaign_id, created_at, campaign:ad_hoc_campaigns(id, name, type)')
-          .eq('student_id', studentId)
-          .eq('school_id', effectiveSchoolId),
+          .select('*, campaign:ad_hoc_campaigns(id, name)')
+          .eq('student_id', studentId),
         supabase
           .from('student_ad_hoc_fees')
-          .select('id, custom_amount, campaign_id, campaign:ad_hoc_campaigns!campaign_id(id, name, type, amount, currency, academic_year_id, status)')
-          .eq('student_id', studentId)
-          .eq('school_id', effectiveSchoolId),
+          .select('*, campaign:ad_hoc_campaigns!campaign_id(*)')
+          .eq('student_id', studentId),
         supabase
           .from('exchange_rates')
-          .select('rate, rate_usd_to_htg')
+          .select('*')
           .eq('school_id', effectiveSchoolId)
           .order('effective_date', { ascending: false })
           .limit(1)
@@ -178,18 +180,46 @@ export async function computeCertifiedStudentArrears({
       'Délai dépassé lors de l\'audit financier du dossier.'
     );
 
+    // Tolérance de repli si une relation imbriquée échoue sur un schéma ancien (évite d'ignorer silencieusement des versements)
+    let rawEnrollments = enrollmentsPrimaryRes.data;
+    if (enrollmentsPrimaryRes.error) {
+      console.warn('studentDebtAudit: enrollments join fallback:', enrollmentsPrimaryRes.error.message);
+      const { data, error } = await supabase.from('enrollments').select('*').eq('student_id', studentId);
+      if (error) throw error;
+      rawEnrollments = data;
+    }
+
+    let rawPayments = paymentsPrimaryRes.data;
+    if (paymentsPrimaryRes.error) {
+      console.warn('studentDebtAudit: payments join fallback:', paymentsPrimaryRes.error.message);
+      const { data, error } = await supabase.from('payments').select('*').eq('student_id', studentId);
+      if (error) throw error;
+      rawPayments = data;
+    }
+
+    let rawAdHoc = adHocPrimaryRes.data;
+    if (adHocPrimaryRes.error) {
+      console.warn('studentDebtAudit: adHoc join fallback:', adHocPrimaryRes.error.message);
+      const { data, error } = await supabase.from('student_ad_hoc_fees').select('*').eq('student_id', studentId);
+      if (!error) rawAdHoc = data;
+      else rawAdHoc = [];
+    }
+
     const allYears = yearsRes.data || [];
     const yearsMap = new Map<string, any>();
     allYears.forEach((y: any) => yearsMap.set(y.id, y));
 
     const rateRow = rateRes.data?.[0];
-    const currentExchangeRate = Number(rateRow?.rate_usd_to_htg || rateRow?.rate || exchangeRateFallback || 135);
+    const parsedRate = Number(rateRow?.rate_usd_to_htg ?? rateRow?.rate ?? safeFallbackRate);
+    const currentExchangeRate = Number.isFinite(parsedRate) && parsedRate > 1 ? parsedRate : safeFallbackRate;
 
-    const allEnrollments = (enrollmentsRes.data || []).map((e: any) => {
-      const ay = Array.isArray(e.academic_year) ? e.academic_year[0] : (e.academic_year || yearsMap.get(e.academic_year_id));
-      const cls = Array.isArray(e.class) ? e.class[0] : e.class;
-      return { ...e, academic_year: ay, class: cls };
-    });
+    const allEnrollments = (rawEnrollments || [])
+      .filter((e: any) => !e.school_id || !effectiveSchoolId || e.school_id === effectiveSchoolId)
+      .map((e: any) => {
+        const ay = Array.isArray(e.academic_year) ? e.academic_year[0] : (e.academic_year || yearsMap.get(e.academic_year_id));
+        const cls = Array.isArray(e.class) ? e.class[0] : e.class;
+        return { ...e, academic_year: ay, class: cls };
+      });
 
     // Trier toutes les inscriptions chronologiquement (du plus ancien au plus récent)
     const sortedEnrollments = [...allEnrollments].sort((a, b) => {
@@ -239,29 +269,34 @@ export async function computeCertifiedStudentArrears({
     }
 
     // Filtrer strictement les paiements valides de cet élève (hors annulés, rejetés, en attente, portefeuille, fournitures)
-    const validFeePayments: any[] = (paymentsRes.data || []).filter((p: any) => {
+    const validFeePayments: any[] = (rawPayments || []).filter((p: any) => {
       if (p.student_id && p.student_id !== studentId) return false;
+      if (p.school_id && effectiveSchoolId && p.school_id !== effectiveSchoolId) return false;
       if (!isPaymentCompleted(p)) return false;
       if (isWalletDeposit(p)) return false;
       if (isSupplyPayment(p)) return false;
       return true;
     });
 
-    const allAdHocFees = (adHocRes.data || []).map((f: any) => ({
-      ...f,
-      campaign: Array.isArray(f.campaign) ? f.campaign[0] : f.campaign
-    }));
+    const allAdHocFees = (rawAdHoc || [])
+      .filter((f: any) => !f.school_id || !effectiveSchoolId || f.school_id === effectiveSchoolId)
+      .map((f: any) => ({
+        ...f,
+        campaign: Array.isArray(f.campaign) ? f.campaign[0] : f.campaign
+      }));
 
     const unallocatedPayments = validFeePayments.filter(p => !p.academic_year_id);
 
     let totalArrears = 0;
     const sessions: SessionArrearsDetail[] = [];
 
-    for (const enr of auditableEnrollments) {
+    for (let idx = 0; idx < auditableEnrollments.length; idx++) {
+      const enr = auditableEnrollments[idx];
       const yrId = enr.academic_year_id;
       const clsId = enr.class_id;
       const yearLabel = enr.academic_year?.label || 'Session';
       const className = enr.class?.name || 'Classe';
+      const isLatestAuditableSession = idx === auditableEnrollments.length - 1;
 
       // Rang chronologique réel : seule la TOUTE PREMIÈRE inscription utilise inscription_fee
       const chronoIndex = sortedEnrollments.findIndex(e => e.academic_year_id === yrId);
@@ -272,12 +307,11 @@ export async function computeCertifiedStudentArrears({
         allFeePlans.find(p => p.class_id === clsId) ||
         null;
 
-      // Paiements attribués à cette année (plus les paiements non tagués si une seule session auditable ou plus récente active)
+      // Paiements attribués à cette année (plus les paiements non tagués rattachés à la session auditable la plus récente)
       const yearSpecificPayments = validFeePayments.filter(p => p.academic_year_id === yrId);
-      const yearPayments =
-        auditableEnrollments.length === 1
-          ? [...yearSpecificPayments, ...unallocatedPayments]
-          : yearSpecificPayments;
+      const yearPayments = isLatestAuditableSession
+        ? [...yearSpecificPayments, ...unallocatedPayments]
+        : yearSpecificPayments;
 
       // Campagnes de cette année
       const yearCampaigns = allAdHocFees.filter((f: any) => {

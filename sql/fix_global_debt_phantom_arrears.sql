@@ -16,6 +16,19 @@
 --      couvre l'engagement contractuel net (à <= 50 HTG d'arrondi), l'arriéré est 0.
 -- ==============================================================================
 
+-- 0. Garantir l'existence des colonnes optionnelles sur les bases plus anciennes
+ALTER TABLE public.payments ADD COLUMN IF NOT EXISTS description TEXT;
+ALTER TABLE public.payments ADD COLUMN IF NOT EXISTS nature TEXT;
+ALTER TABLE public.payments ADD COLUMN IF NOT EXISTS type TEXT DEFAULT 'Scolarité';
+ALTER TABLE public.payments ADD COLUMN IF NOT EXISTS fee_type TEXT;
+ALTER TABLE public.payments ADD COLUMN IF NOT EXISTS ad_hoc_campaign_id UUID;
+ALTER TABLE public.payments ADD COLUMN IF NOT EXISTS currency TEXT DEFAULT 'HTG';
+ALTER TABLE public.payments ADD COLUMN IF NOT EXISTS exchange_rate_applied NUMERIC;
+ALTER TABLE public.payments ADD COLUMN IF NOT EXISTS amount_htg_equivalent NUMERIC;
+ALTER TABLE public.payments ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'VALIDE';
+ALTER TABLE public.payments ADD COLUMN IF NOT EXISTS payment_method TEXT;
+ALTER TABLE public.student_ad_hoc_fees ADD COLUMN IF NOT EXISTS custom_amount NUMERIC;
+
 DROP FUNCTION IF EXISTS public.get_student_global_debt(uuid);
 DROP FUNCTION IF EXISTS public.get_student_global_debt(uuid, uuid);
 DROP FUNCTION IF EXISTS public.get_student_global_debt(uuid, uuid, uuid);
@@ -222,7 +235,7 @@ BEGIN
             p.amount_htg_equivalent
         FROM public.payments p
         WHERE p.student_id = p_student_id
-          AND p.school_id = v_school_id
+          AND (p.school_id = v_school_id OR p.school_id IS NULL)
           AND (
             v_academic_year_id IS NULL
             OR p.academic_year_id = v_academic_year_id

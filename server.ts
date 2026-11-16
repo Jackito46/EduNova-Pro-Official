@@ -6301,7 +6301,7 @@ async function startServer() {
       res.json({
         success: true,
         config: {
-          displayEmail: 'contact@edunova-pro.tech',
+          displayEmail: 'jackito46@gmail.com',
           whatsappNumber: '50936045639',
           whatsappDisplay: '+509 3604-5639',
           secondaryPhoneDisplay: '3350-8416',

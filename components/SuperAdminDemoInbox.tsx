@@ -101,7 +101,7 @@ export const SuperAdminDemoInbox: React.FC<SuperAdminDemoInboxProps> = ({ onNewC
   const [searchTerm, setSearchTerm] = useState('');
 
   const [routing, setRouting] = useState<RoutingFormState>({
-    publicEmail: 'contact@edunova-pro.tech',
+    publicEmail: 'jackito46@gmail.com',
     notificationEmail: '',
     whatsappNumber: '+509 3604-5639',
     secondaryPhoneDisplay: '3350-8416',
@@ -131,7 +131,7 @@ export const SuperAdminDemoInbox: React.FC<SuperAdminDemoInboxProps> = ({ onNewC
 
       if (data.routing) {
         setRouting({
-          publicEmail: data.routing.publicEmail || 'contact@edunova-pro.tech',
+          publicEmail: data.routing.publicEmail || 'jackito46@gmail.com',
           notificationEmail: data.routing.notificationEmail || '',
           whatsappNumber: data.routing.whatsappNumber || '+509 3604-5639',
           secondaryPhoneDisplay: data.routing.secondaryPhoneDisplay || '3350-8416',
@@ -580,7 +580,7 @@ export const SuperAdminDemoInbox: React.FC<SuperAdminDemoInboxProps> = ({ onNewC
                   type="text"
                   value={routing.notificationEmail}
                   onChange={(e) => setRouting((prev) => ({ ...prev, notificationEmail: e.target.value }))}
-                  placeholder="Ex: infostarstech2010@gmail.com, contact@edunova-pro.tech"
+                  placeholder="Ex: jackito46@gmail.com, infostarstech2010@gmail.com"
                   className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-xs font-mono font-bold text-slate-900 outline-none focus:border-indigo-600"
                 />
                 <p className="text-[11px] text-slate-500">
@@ -596,7 +596,7 @@ export const SuperAdminDemoInbox: React.FC<SuperAdminDemoInboxProps> = ({ onNewC
                   type="email"
                   value={routing.publicEmail}
                   onChange={(e) => setRouting((prev) => ({ ...prev, publicEmail: e.target.value }))}
-                  placeholder="contact@edunova-pro.tech"
+                  placeholder="jackito46@gmail.com"
                   className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-xs font-mono font-bold text-slate-900 outline-none focus:border-indigo-600"
                 />
               </div>

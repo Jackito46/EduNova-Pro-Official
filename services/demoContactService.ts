@@ -74,7 +74,7 @@ const DATA_DIR = path.resolve(process.cwd(), 'data');
 const REQUESTS_FILE = path.join(DATA_DIR, 'demo_requests.json');
 const ROUTING_FILE = path.join(DATA_DIR, 'demo_routing_config.json');
 
-const DEFAULT_PUBLIC_EMAIL = 'contact@edunova-pro.tech';
+const DEFAULT_PUBLIC_EMAIL = 'jackito46@gmail.com';
 const DEFAULT_WHATSAPP_NUMBER = '50936045639';
 const DEFAULT_SECONDARY_PHONE = '3350-8416';
 
@@ -267,11 +267,12 @@ async function resolveEffectiveRuntimeRouting(supabaseClient: any) {
     local.notificationEmail,
     gsRouting.notification_email,
     process.env.DEMO_NOTIFICATION_EMAIL || '',
-    gsIdentity.support_email && !String(gsIdentity.support_email).includes('support@edunova.pro')
+    publicEmail,
+    gsIdentity.support_email &&
+    !String(gsIdentity.support_email).includes('support@edunova.pro') &&
+    !String(gsIdentity.support_email).includes('contact@edunova-pro.tech')
       ? gsIdentity.support_email
-      : '',
-    sb.schoolSmtpRow?.email_from_address || '',
-    publicEmail
+      : ''
   ];
 
   const uniqueTargets: string[] = [];

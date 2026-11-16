@@ -393,8 +393,13 @@ const StudentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
         supabase.from('exchange_rates').select('*').eq('school_id', user.school_id).order('effective_date', { ascending: false }).limit(1)
       ]);
       
+      let resolvedExchangeRate = exchangeRate > 1 && Number.isFinite(exchangeRate) ? exchangeRate : 135;
       if (rateRes.data && rateRes.data.length > 0) {
-        setExchangeRate(Number(rateRes.data[0].rate));
+        const fetchedRate = Number(rateRes.data[0].rate_usd_to_htg ?? rateRes.data[0].rate ?? 0);
+        if (fetchedRate > 1 && Number.isFinite(fetchedRate)) {
+          resolvedExchangeRate = fetchedRate;
+          setExchangeRate(fetchedRate);
+        }
       }
 
       if (yearsRes.error) console.error("Erreur chargement années académiques:", yearsRes.error);
@@ -453,7 +458,7 @@ const StudentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
               studentId: id,
               schoolId: user.school_id,
               excludeYearId: isReenroll ? (resolvedTargetYearId || undefined) : undefined,
-              exchangeRateFallback: rateRes.data?.[0]?.rate ? Number(rateRes.data[0].rate) : exchangeRate
+              exchangeRateFallback: resolvedExchangeRate
             });
             debtValue = audit.totalArrears;
             setStudentDebt(debtValue);
