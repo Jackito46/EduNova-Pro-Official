@@ -976,7 +976,10 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
       const curTuitionAddition = Number(currentEnrollment?.tuition_addition || 0);
       const curStudentDiscount = Number(studentData.discount_amount || 0);
       const curTotalDiscount = curTuitionDiscount + curStudentDiscount;
-      const curTuitionHTG = currentPlan ? (Number(currentPlan.tuition_fee || 0) + curTuitionAddition) : curTuitionAddition;
+      const curBaseTuitionHTG = currentPlan
+        ? Number((studentData.is_foreign && currentPlan.foreign_tuition_fee ? currentPlan.foreign_tuition_fee : currentPlan.tuition_fee) || 0)
+        : 0;
+      const curTuitionHTG = curBaseTuitionHTG + curTuitionAddition;
       const curTuitionUSD = currentPlan ? Number(currentPlan.tuition_fee_usd || 0) : 0;
 
       const curAdmBal = computeFeeCategoryBalance(curAdmHTG, curAdmUSD, curAdmPayments, currentExchangeRate);
@@ -995,8 +998,9 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
       const curSessionTotalDue = curAdmBal.effectiveDueHTG + curMiscBal.effectiveDueHTG + curTuitionBal.effectiveDueHTG + curAdHocDue;
       const curSessionTotalPaid = curAdmBal.paidHTGEquiv + curMiscBal.paidHTGEquiv + curTuitionBal.paidHTGEquiv + curAdHocPaid;
       const curSessionRemaining = curAdmBal.remainingHTGEquiv + curMiscBal.remainingHTGEquiv + curTuitionBal.remainingHTGEquiv + Math.max(0, curAdHocDue - curAdHocPaid);
-      const curSolvent = curSessionRemaining <= 50;
-      const curTrueRemaining = curSolvent ? 0 : Math.round(curSessionRemaining);
+      const curNetSessionDiff = curSessionTotalDue - curSessionTotalPaid;
+      const curSolvent = curSessionRemaining <= 50 || curNetSessionDiff <= 50;
+      const curTrueRemaining = curSolvent ? 0 : Math.min(Math.round(curSessionRemaining), Math.max(0, Math.round(curNetSessionDiff)));
 
       const currentSessionDetail: SessionAuditDetail = {
         academicYearId: targetYearId,
@@ -3531,6 +3535,23 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
   const isMiscForced = selectedStudent && !isInscriptionForced && selectedStudent.plan?.is_misc_mandatory && isMiscSubstantial;
   const isFeeTypeLocked = isInscriptionForced || isMiscForced;
 
+  const currentSessionAudit = selectedStudent
+    ? dossierAuditSessions.find((s) => s.isCurrentSession && (!targetYearId || s.academicYearId === targetYearId)) ||
+      dossierAuditSessions.find((s) => s.isCurrentSession)
+    : undefined;
+  const targetAcademicYearObj = academicYears.find((y) => y.id === targetYearId) || activeYear;
+  const isCurrentTargetFuture = Boolean(
+    currentSessionAudit?.isFutureSession ||
+    String(targetAcademicYearObj?.status || '').toUpperCase() === 'FUTURE'
+  );
+  const rawCurrentSessionRemaining = currentSessionAudit
+    ? Number(currentSessionAudit.remainingDebt || 0)
+    : Math.max(0, Math.round(Number(selectedStudent?.totalRemaining || 0)));
+  const currentSessionNonFutureDebt =
+    selectedStudent && !isCurrentTargetFuture
+      ? (rawCurrentSessionRemaining <= 50 ? 0 : Math.round(rawCurrentSessionRemaining))
+      : 0;
+
   if (apiError && !selectedStudent) {
     return (
       <div className="flex h-[60vh] items-center justify-center p-6">
@@ -3813,17 +3834,29 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
                         );
                       })()}
                       <div className="mt-2.5 pt-2 border-t border-slate-200/60 flex items-center justify-between flex-wrap gap-2">
-                        <div className="flex items-center gap-1.5 text-xs text-slate-500 font-medium">
-                          <ShieldCheck size={13} className={globalDebt === 0 ? "text-emerald-600" : "text-rose-600"} />
-                          <span>Audit Historique : </span>
-                          <strong className={globalDebt === 0 ? "text-emerald-700 font-bold" : "text-rose-700 font-bold"}>
-                            {globalDebt === 0 ? "Solvabilité Certifiée (0 Arriéré)" : `${globalDebt.toLocaleString()} HTG d'arriérés`}
-                          </strong>
-                        </div>
+                        {globalDebt > 0 ? (
+                          <div className="flex items-center gap-1.5 text-xs text-slate-500 font-medium">
+                            <ShieldAlert size={13} className="text-rose-600" />
+                            <span>Audit Historique : </span>
+                            <strong className="text-rose-700 font-bold">
+                              {`${globalDebt.toLocaleString()} HTG d'arriérés`}
+                            </strong>
+                          </div>
+                        ) : !loadingDebt && currentSessionNonFutureDebt > 0 ? (
+                          <div className="flex items-center gap-1.5 text-xs text-slate-500 font-medium">
+                            <AlertTriangle size={13} className="text-amber-600" />
+                            <span>Reliquat à solder ({currentSessionAudit?.academicYearLabel || targetAcademicYearObj?.label || 'Session'}) : </span>
+                            <strong className="text-amber-700 font-bold">
+                              {`${currentSessionNonFutureDebt.toLocaleString()} HTG`}
+                            </strong>
+                          </div>
+                        ) : (
+                          <div />
+                        )}
                         <button
                           type="button"
                           onClick={() => setIsDossierModalOpen(true)}
-                          className="px-2.5 py-1 bg-blue-50 hover:bg-blue-100 text-blue-700 text-[11px] font-bold rounded-lg transition-all flex items-center gap-1 cursor-pointer border border-blue-200"
+                          className="px-2.5 py-1 bg-blue-50 hover:bg-blue-100 text-blue-700 text-[11px] font-bold rounded-lg transition-all flex items-center gap-1 cursor-pointer border border-blue-200 ml-auto"
                         >
                           <FileText size={12} />
                           Réviser tout son dossier en profondeur
@@ -4672,7 +4705,7 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
                     <AlertTriangle className="text-rose-600 mt-0.5 shrink-0" size={16} />
                     <div>
                       <p className="text-[11px] sm:text-xs text-rose-900 font-semibold leading-relaxed">
-                        <strong className="font-bold">Arriérés Confirmés :</strong> L'{terminology.student.toLowerCase()} a une dette réelle de {globalDebt.toLocaleString()} HTG sur son historique ({dossierAuditSessions.filter(s => !s.isCurrentSession && s.remainingDebt > 0).map(s => s.academicYearLabel).join(', ') || 'session(s) précédente(s)'}).
+                        <strong className="font-bold">Arriérés Confirmés :</strong> L'{terminology.student.toLowerCase()} a une dette réelle de {globalDebt.toLocaleString()} HTG sur son historique ({dossierAuditSessions.filter(s => !s.isCurrentSession && !s.isFutureSession && s.remainingDebt > 0).map(s => s.academicYearLabel).join(', ') || 'session(s) précédente(s)'}).
                       </p>
                       <p className="text-[10.5px] text-rose-700 mt-0.5">
                         Assurez-vous d'imputer le paiement à la bonne session ou de régulariser ces arriérés.
@@ -4710,7 +4743,7 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
                         <CheckCircle2 className="text-blue-600 mt-0.5 shrink-0" size={16} />
                         <div>
                           <p className="text-[11px] sm:text-xs text-blue-900 font-semibold leading-relaxed">
-                            <strong className="font-bold">Dossier Conforme (Aucun Arriéré) :</strong> L'{terminology.student.toLowerCase()} n'a aucune dette sur les sessions antérieures. Le montant saisi sera imputé directement {selectedStudent.isReenrollment ? 'aux frais de réinscription' : "aux frais d'inscription"} de la session ciblée ({(academicYears.find(y => y.id === targetYearId) || activeYear)?.label || 'Session active'}).
+                            <strong className="font-bold">Régularisation d'Inscription :</strong> Le montant saisi sera imputé directement {selectedStudent.isReenrollment ? 'aux frais de réinscription' : "aux frais d'inscription"} de la session ciblée ({targetAcademicYearObj?.label || 'Session active'}).
                           </p>
                           <p className="text-[10.5px] text-blue-700 mt-0.5">
                             {selectedStudent.isReenrollment ? 'Frais de réinscription de la session : ' : "Frais d'inscription de la session : "}
@@ -4726,48 +4759,30 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
                         <FileText size={13} /> Réviser le dossier
                       </button>
                     </div>
-                  ) : Boolean(selectedStudent?.otherEnrollments && selectedStudent.otherEnrollments.length > 0) ? (
-                    <div className="bg-emerald-50/80 p-3.5 rounded-2xl border border-emerald-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-xs">
+                  ) : currentSessionNonFutureDebt > 0 ? (
+                    <div className="bg-amber-50/80 p-3.5 rounded-2xl border border-amber-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-xs">
                       <div className="flex items-start gap-2.5">
-                        <CheckCircle2 className="text-emerald-600 mt-0.5 shrink-0" size={16} />
+                        <AlertTriangle className="text-amber-600 mt-0.5 shrink-0" size={16} />
                         <div>
-                          <p className="text-[11px] sm:text-xs text-emerald-900 font-medium leading-relaxed">
-                            <strong className="font-bold">Solvabilité Certifiée :</strong> L'{terminology.student.toLowerCase()} est 100% en règle pour l'ensemble des sessions antérieures. Aucun arriéré à apurer.
+                          <p className="text-[11px] sm:text-xs text-amber-950 font-medium leading-relaxed">
+                            <strong className="font-bold">Reliquat à finaliser :</strong> L'{terminology.student.toLowerCase()} a encore un solde de <strong className="font-bold font-mono">{currentSessionNonFutureDebt.toLocaleString()} HTG</strong> à acquitter pour solder la session {currentSessionAudit?.academicYearLabel || targetAcademicYearObj?.label || 'active'}.
                           </p>
-                          <p className="text-[10.5px] text-emerald-700 mt-0.5">
-                            {selectedStudent.otherEnrollments.some((e: any) => e.academic_year?.status === 'FUTURE')
-                              ? `Élève également pré-inscrit(e) pour la future session (${selectedStudent.otherEnrollments.find((e: any) => e.academic_year?.status === 'FUTURE')?.academic_year?.label || 'Prochaine session'}).`
-                              : `Le versement sera intégralement imputé à la session sélectionnée (${(academicYears.find(y => y.id === targetYearId) || activeYear)?.label || 'Session active'}).`}
-                          </p>
+                          {selectedStudent.otherEnrollments?.some((e: any) => e.academic_year?.status === 'FUTURE') && (
+                            <p className="text-[10.5px] text-amber-800 mt-0.5">
+                              Pré-inscrit(e) pour la future session ({selectedStudent.otherEnrollments.find((e: any) => e.academic_year?.status === 'FUTURE')?.academic_year?.label || 'Prochaine session'}) — ce reliquat reste dû avant clôture complète.
+                            </p>
+                          )}
                         </div>
                       </div>
                       <button
                         type="button"
                         onClick={() => setIsDossierModalOpen(true)}
-                        className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl shrink-0 transition-all flex items-center gap-1.5 cursor-pointer shadow-xs self-end sm:self-center"
+                        className="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold rounded-xl shrink-0 transition-all flex items-center gap-1.5 cursor-pointer shadow-xs self-end sm:self-center whitespace-nowrap"
                       >
-                        <ShieldCheck size={13} /> Certificat d'audit
+                        <FileText size={13} /> Examiner le dossier
                       </button>
                     </div>
-                  ) : (
-                    <div className="bg-emerald-50/80 p-3.5 rounded-2xl border border-emerald-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-xs">
-                      <div className="flex items-start gap-2.5">
-                        <CheckCircle2 className="text-emerald-600 mt-0.5 shrink-0" size={16} />
-                        <div>
-                          <p className="text-[11px] sm:text-xs text-emerald-900 font-medium leading-relaxed">
-                            <strong className="font-bold">Dossier Initialisé :</strong> Première inscription enregistrée. Aucun arriéré antérieur.
-                          </p>
-                        </div>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => setIsDossierModalOpen(true)}
-                        className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl shrink-0 transition-all flex items-center gap-1.5 cursor-pointer shadow-xs self-end sm:self-center"
-                      >
-                        <FileText size={13} /> Détail du dossier
-                      </button>
-                    </div>
-                  )
+                  ) : null
                 )
               )}
 
