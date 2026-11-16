@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { FluidLoadingState, SkeletonTable } from './SkeletonLoader';
 import { 
@@ -230,6 +230,10 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
   const [activeYear, setActiveYear] = useState<any>(null);
   const [academicYears, setAcademicYears] = useState<any[]>([]);
   const [targetYearId, setTargetYearId] = useState<string>('');
+  const userSelectedYearRef = useRef(false);
+  const lastInitializedNavKeyRef = useRef<string>('');
+  const dismissedUrlNavKeyRef = useRef<string>('');
+  const loadDetailsSeqRef = useRef(0);
   const [globalDebt, setGlobalDebt] = useState<number>(0);
   const [loadingDebt, setLoadingDebt] = useState(false);
   const [dossierAuditSessions, setDossierAuditSessions] = useState<SessionAuditDetail[]>([]);
@@ -673,18 +677,18 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
     const fetchContext = async () => {
       const applyAcademicYears = (years: any[]) => {
         if (!years || years.length === 0) return;
-        const filtered = years.filter(y => y.status === 'ACTIVE' || y.status === 'FUTURE' || y.is_active);
-        const finalYears = filtered.length > 0 ? filtered : years;
-        setAcademicYears(finalYears);
-        const active = finalYears.find(y => y.status === 'ACTIVE' || y.is_active) || finalYears[0];
+        setAcademicYears(years);
+        const active = years.find(y => y.status === 'ACTIVE' || y.is_active) || years[0];
         setActiveYear(active);
 
-        const searchParams = new URLSearchParams(location.search);
-        const requestedYearId = location.state?.academicYearId || searchParams.get('academicYearId') || searchParams.get('yearId');
-        if (requestedYearId && finalYears.some(y => y.id === requestedYearId)) {
-          setTargetYearId(requestedYearId);
-        } else if (active) {
-          setTargetYearId(active.id);
+        if (!userSelectedYearRef.current) {
+          const searchParams = new URLSearchParams(location.search);
+          const requestedYearId = location.state?.academicYearId || searchParams.get('academicYearId') || searchParams.get('yearId');
+          if (requestedYearId && years.some(y => y.id === requestedYearId)) {
+            setTargetYearId(prev => prev || requestedYearId);
+          } else if (active) {
+            setTargetYearId(prev => prev || active.id);
+          }
         }
       };
 
@@ -778,7 +782,7 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
       }
     };
     fetchContext();
-  }, [user]);
+  }, [user?.id, user?.school_id]);
 
   // 2. MOTEUR DE RECHERCHE ÉTUDIANTS (En ligne RPC + Fallback Hors-ligne Chiffré)
   useEffect(() => {
@@ -889,7 +893,8 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
     priorEnrollments: any[],
     allPayments: any[],
     currentPlan: any,
-    currentCampaigns: any[]
+    currentCampaigns: any[],
+    expectedSeq?: number
   ) => {
     setLoadingDebt(true);
     try {
@@ -897,11 +902,23 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
 
       // 1. Session courante / ciblée
       const isEnrolledCurrent = Boolean(currentEnrollment);
-      const currentYearLabel = academicYears.find(y => y.id === targetYearId)?.label || activeYear?.label || 'Session Active';
+      const targetYearObjForPrior = academicYears.find(y => y.id === targetYearId) || activeYear;
+      const parseStartYr = (lbl?: string) => {
+        const m = String(lbl || '').match(/(\d{4})/);
+        return m ? parseInt(m[1], 10) : 0;
+      };
+      const targetStartYr = parseStartYr(targetYearObjForPrior?.label);
+      const strictlyPriorEnrollments = (priorEnrollments || []).filter((e: any) => {
+        if (e.academic_year?.status === 'FUTURE') return false;
+        const enrStart = parseStartYr(e.academic_year?.label);
+        if (targetStartYr > 0 && enrStart > 0) return enrStart < targetStartYr;
+        return e.academic_year_id !== targetYearId;
+      });
+      const currentYearLabel = targetYearObjForPrior?.label || 'Session Active';
       const currentClassName = currentEnrollment?.class?.name || studentData.class?.name || (isEnrolledCurrent ? 'Classe assignée' : 'Non assignée (Régularisation)');
       const currentLevel = currentEnrollment?.class?.level || studentData.class?.level || 'N/A';
 
-      const hasPrior = (priorEnrollments?.length || 0) > 0;
+      const hasPrior = strictlyPriorEnrollments.length > 0 || Boolean(studentData.has_previous_enrollment);
       
       // Paiements et ventilation pour la session active ciblée
       const isAdmissionPayment = (p: any) => {
@@ -1173,13 +1190,18 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
         });
       }
 
+      if (expectedSeq !== undefined && expectedSeq !== loadDetailsSeqRef.current) return;
       setDossierAuditSessions([currentSessionDetail, ...sessionAudits]);
       setGlobalDebt(cumulativePastDebt);
     } catch (err) {
       console.error("Erreur lors de l'audit approfondi du dossier:", err);
-      setGlobalDebt(0);
+      if (expectedSeq === undefined || expectedSeq === loadDetailsSeqRef.current) {
+        setGlobalDebt(0);
+      }
     } finally {
-      setLoadingDebt(false);
+      if (expectedSeq === undefined || expectedSeq === loadDetailsSeqRef.current) {
+        setLoadingDebt(false);
+      }
     }
   }, [user?.school_id, currentExchangeRate, academicYears, activeYear]);
 
@@ -1208,6 +1230,7 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
 
   const loadStudentDetails = useCallback(async (studentId: string, yearId: string) => {
     if (!yearId) return;
+    const currentSeq = ++loadDetailsSeqRef.current;
     setLoadingDebt(true);
     try {
       const isOfflineNow = typeof navigator !== 'undefined' && !navigator.onLine;
@@ -1426,6 +1449,8 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
           }
         }
 
+        if (currentSeq !== loadDetailsSeqRef.current) return;
+
         data.wallet_balance_htg = certifiedWalletHTG;
 
         // Mise à jour immédiate des transactions pour afficher la liste sans délai
@@ -1587,6 +1612,19 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
           );
         };
 
+        const parseStartYr = (lbl?: string) => {
+          const m = String(lbl || '').match(/(\d{4})/);
+          return m ? parseInt(m[1], 10) : 0;
+        };
+        const targetYearObjForReturning = academicYears.find(y => y.id === yearId) || activeYear;
+        const targetStartYr = parseStartYr(targetYearObjForReturning?.label);
+        const strictlyPriorEnrollments = (otherEnrollments || []).filter((e: any) => {
+          if (e.academic_year?.status === 'FUTURE') return false;
+          const enrStart = parseStartYr(e.academic_year?.label);
+          if (targetStartYr > 0 && enrStart > 0) return enrStart < targetStartYr;
+          return e.academic_year_id !== yearId;
+        });
+
         // Filtrer les paiements pour cette session académique:
         // 1) Si le paiement est explicitement rattaché à yearId: OK
         // 2) Si le paiement est un paiement d'admission/inscription et n'est pas lié à une autre inscription concurrente: OK
@@ -1595,13 +1633,13 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
           if (p.academic_year_id === yearId) return true;
           
           if (isAdmissionPayment(p)) {
-            if (!p.academic_year_id) return otherEnrollments.length === 0 || !!enrollment;
+            if (!p.academic_year_id) return strictlyPriorEnrollments.length === 0 || !!enrollment;
             const isEnrolledInOther = otherEnrollments.some(e => e.academic_year_id === p.academic_year_id);
             if (!isEnrolledInOther && enrollment) return true;
           }
 
           if (!p.academic_year_id) {
-            return otherEnrollments.length === 0 || !otherEnrollments.some(e => e.academic_year_id === p.academic_year_id);
+            return strictlyPriorEnrollments.length === 0;
           }
           
           const isEnrolledInOther = otherEnrollments.some(e => e.academic_year_id === p.academic_year_id);
@@ -1618,13 +1656,10 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
         const miscPayments = validPayments.filter(p => !isCampaignPayment(p) && !isAdmissionPayment(p) && isMiscPayment(p));
         const tuitionPayments = validPayments.filter(p => !isCampaignPayment(p) && !isAdmissionPayment(p) && !isMiscPayment(p));
 
-        // Vérifier si l'étudiant a des inscriptions antérieures (Réinscription vs Inscription)
-        // Règle d'or : Un élève déjà présent dans le système pour une session antérieure est un ancien élève (Réinscription).
-        // Il ne paie JAMAIS les frais d'inscription initiale, mais les frais de réinscription (qui peuvent être 0 si l'école ne le recommande pas).
+        // Vérifier si l'étudiant a des inscriptions chronologiquement antérieures à yearId (Réinscription vs Inscription)
+        // Une réinscription dans une session FUTURE n'est pas une inscription antérieure pour une session PASSÉE/ACTIVE.
         const isReturning = Boolean(
-          (otherEnrollments && otherEnrollments.length > 0) ||
-          (allEnrollments && allEnrollments.length > 1) ||
-          (allEnrollments && allEnrollments.some((e: any) => e.academic_year_id !== yearId)) ||
+          strictlyPriorEnrollments.length > 0 ||
           data.has_previous_enrollment
         );
         const hasPreviousEnrollment = isReturning;
@@ -1836,6 +1871,8 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
           autoCurrency = (tuitionUSD > 0 && tuitionHTG === 0) ? 'USD' : 'HTG';
         }
 
+        if (currentSeq !== loadDetailsSeqRef.current) return;
+
         setFeeType(autoFeeType);
         if (paymentMethod !== 'MonCash') {
           setCurrency(autoCurrency);
@@ -1898,14 +1935,26 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
         setParentPhoneCustom(data.parent_phone || data.phone || '');
         setPayerPhoneCustom(data.parent_phone || data.phone || '');
         setIsLocked(true);
-        auditStudentDossierInDepth(data, yearId, enrollment, otherEnrollments, allStudentPayments, plan, campaignsList);
+        auditStudentDossierInDepth(data, yearId, enrollment, otherEnrollments, allStudentPayments, plan, campaignsList, currentSeq);
       }
     } catch (err) {
       console.error("Load details error:", err);
     } finally {
-      setLoadingDebt(false);
+      if (currentSeq === loadDetailsSeqRef.current) {
+        setLoadingDebt(false);
+      }
     }
-  }, [auditStudentDossierInDepth, currentExchangeRate]);
+  }, [auditStudentDossierInDepth, currentExchangeRate, academicYears, activeYear]);
+
+  // Changement explicite de session académique par le guichetier (ne doit jamais être écrasé par l'URL initiale)
+  const handleSelectTargetYear = useCallback((newYr: string) => {
+    if (!newYr) return;
+    userSelectedYearRef.current = true;
+    setTargetYearId(newYr);
+    if (selectedStudent?.id) {
+      loadStudentDetails(selectedStudent.id, newYr);
+    }
+  }, [selectedStudent?.id, loadStudentDetails]);
 
   useEffect(() => {
     const searchParams = new URLSearchParams(location.search);
@@ -1915,7 +1964,12 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
 
     const effectiveStudentId = location.state?.studentId || queryStudentId;
     const effectiveStudentName = location.state?.studentName || queryStudentName;
-    const effectiveYearId = location.state?.academicYearId || queryYearId || targetYearId || activeYear?.id;
+    const explicitRouteYearId = location.state?.academicYearId || queryYearId || '';
+    const navSig = `${location.key || ''}::${effectiveStudentId || ''}::${explicitRouteYearId}`;
+
+    if (!effectiveStudentId) return;
+    if (dismissedUrlNavKeyRef.current === navSig) return;
+    if (lastInitializedNavKeyRef.current === navSig) return;
 
     if (effectiveStudentName && !selectedStudent) {
       try {
@@ -1925,41 +1979,37 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
       }
     }
 
-    if (effectiveStudentId) {
-      if (effectiveYearId && effectiveYearId !== targetYearId) {
-        setTargetYearId(effectiveYearId);
-      }
-      if (effectiveYearId) {
-        loadStudentDetails(effectiveStudentId, effectiveYearId);
-      } else {
-        // Fallback: fetch student's enrollment to obtain the target academic year
-        (async () => {
-          try {
-            const { data: enrs } = await supabase
-              .from('enrollments')
-              .select('academic_year_id')
-              .eq('student_id', effectiveStudentId)
-              .order('created_at', { ascending: false })
-              .limit(1);
-            const foundYear = enrs?.[0]?.academic_year_id || activeYear?.id;
-            if (foundYear) {
-              setTargetYearId(foundYear);
-              loadStudentDetails(effectiveStudentId, foundYear);
-            }
-          } catch (e) {
-            console.warn("Could not auto-resolve student academic year:", e);
-          }
-        })();
-      }
-    }
-  }, [location.state, location.search, targetYearId, activeYear?.id, loadStudentDetails]);
+    const resolvedYearId = explicitRouteYearId || targetYearId || activeYear?.id;
 
-  // Recharger les détails si l'année cible change et qu'un étudiant est déjà sélectionné
-  useEffect(() => {
-    if (selectedStudent && targetYearId && isLocked) {
-      loadStudentDetails(selectedStudent.id, targetYearId);
+    if (resolvedYearId) {
+      lastInitializedNavKeyRef.current = navSig;
+      userSelectedYearRef.current = false;
+      if (resolvedYearId !== targetYearId) {
+        setTargetYearId(resolvedYearId);
+      }
+      loadStudentDetails(effectiveStudentId, resolvedYearId);
+    } else if (!loading) {
+      lastInitializedNavKeyRef.current = navSig;
+      (async () => {
+        try {
+          const { data: enrs } = await supabase
+            .from('enrollments')
+            .select('academic_year_id')
+            .eq('student_id', effectiveStudentId)
+            .order('created_at', { ascending: false })
+            .limit(1);
+          const foundYear = enrs?.[0]?.academic_year_id || activeYear?.id;
+          if (foundYear) {
+            userSelectedYearRef.current = false;
+            setTargetYearId(foundYear);
+            loadStudentDetails(effectiveStudentId, foundYear);
+          }
+        } catch (e) {
+          console.warn("Could not auto-resolve student academic year:", e);
+        }
+      })();
     }
-  }, [targetYearId, selectedStudent?.id]);
+  }, [location.key, location.state, location.search, activeYear?.id, loading, loadStudentDetails]);
 
   // Real-time synchronization for selected student details and balances on the administrative form
   useEffect(() => {
@@ -2197,6 +2247,17 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
 
   // FONCTION DE REMISE À ZÉRO TOTALE
   const resetAllFields = () => {
+    const searchParams = new URLSearchParams(location.search);
+    const queryStudentId = searchParams.get('studentId');
+    const queryYearId = searchParams.get('academicYearId') || searchParams.get('yearId');
+    const effectiveStudentId = location.state?.studentId || queryStudentId;
+    const explicitRouteYearId = location.state?.academicYearId || queryYearId || '';
+    if (effectiveStudentId) {
+      dismissedUrlNavKeyRef.current = `${location.key || ''}::${effectiveStudentId}::${explicitRouteYearId}`;
+    }
+    userSelectedYearRef.current = false;
+    loadDetailsSeqRef.current += 1;
+
     setStudentSearch('');
     setSearchResults([]);
     setSelectedStudent(null);
@@ -2218,6 +2279,10 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
     setPayerPhoneCustom('');
     setShowConfirmationModal(false);
     setMoncashTransactionData(null);
+
+    if (location.search || location.state?.studentId) {
+      navigate('/economat/frais', { replace: true, state: null });
+    }
   };
 
   // Soumission de la double-validation par un supérieur
@@ -2269,7 +2334,7 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
     const handleValidation = async (e?: React.FormEvent, superiorOverrideName?: string, bypassSummary: boolean = false) => {
       if (e) e.preventDefault();
       
-      if (!activeYear || !user?.school_id) {
+      if ((!activeYear && !targetYearId) || !user?.school_id) {
         toast.error("Session administrative invalide ou école non reconnue.");
         return;
       }
@@ -3511,16 +3576,31 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
                <p className="text-xs text-rose-700 mt-0.5">L'{terminology.student.toLowerCase()} présente un reliquat total non apuré sur son historique académique.</p>
              </div>
           </div>
-          <div className="bg-white px-4 py-2 rounded-xl border border-rose-200 text-center md:text-right shadow-2xs flex flex-col items-center md:items-end gap-0.5">
+          <div className="bg-white px-4 py-2 rounded-xl border border-rose-200 text-center md:text-right shadow-2xs flex flex-col items-center md:items-end gap-1">
              <p className="text-[9px] font-black text-rose-500 uppercase tracking-widest">Arriéré Total Cumulé</p>
              <p className="text-lg sm:text-xl font-black text-rose-700 font-mono tracking-tight">{globalDebt.toLocaleString()} HTG</p>
-             <button
-               type="button"
-               onClick={() => setIsDossierModalOpen(true)}
-               className="mt-0.5 text-xs font-bold text-rose-600 hover:text-rose-800 flex items-center gap-1 cursor-pointer hover:underline"
-             >
-               <FileText size={12} /> Réviser le dossier
-             </button>
+             <div className="flex items-center gap-2.5 flex-wrap justify-center md:justify-end mt-0.5">
+               {(() => {
+                 const firstDebtSession = dossierAuditSessions.find(s => !s.isCurrentSession && !s.isFutureSession && s.remainingDebt > 0);
+                 if (!firstDebtSession?.academicYearId) return null;
+                 return (
+                   <button
+                     type="button"
+                     onClick={() => handleSelectTargetYear(firstDebtSession.academicYearId)}
+                     className="px-2.5 py-1 bg-rose-600 hover:bg-rose-700 text-white text-[11px] font-bold rounded-lg transition-colors cursor-pointer whitespace-nowrap"
+                   >
+                     Régler {firstDebtSession.academicYearLabel}
+                   </button>
+                 );
+               })()}
+               <button
+                 type="button"
+                 onClick={() => setIsDossierModalOpen(true)}
+                 className="text-xs font-bold text-rose-600 hover:text-rose-800 flex items-center gap-1 cursor-pointer hover:underline"
+               >
+                 <FileText size={12} /> Réviser le dossier
+               </button>
+             </div>
           </div>
         </div>
       )}
@@ -3956,12 +4036,7 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
                   <AcademicSessionPill
                     academicYears={academicYears}
                     selectedYearId={targetYearId}
-                    onSelectYear={(newYr) => {
-                      setTargetYearId(newYr);
-                      if (selectedStudent) {
-                        loadStudentDetails(selectedStudent.id, newYr);
-                      }
-                    }}
+                    onSelectYear={handleSelectTargetYear}
                     variant="field"
                     size="md"
                     colorScheme="blue"
@@ -4524,13 +4599,28 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
                       </p>
                     </div>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => setIsDossierModalOpen(true)}
-                    className="px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold rounded-xl shrink-0 transition-all flex items-center gap-1.5 cursor-pointer shadow-xs self-end sm:self-center"
-                  >
-                    <FileText size={13} /> Examiner le dossier
-                  </button>
+                  <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
+                    {(() => {
+                      const firstDebtSession = dossierAuditSessions.find(s => !s.isCurrentSession && !s.isFutureSession && s.remainingDebt > 0);
+                      if (!firstDebtSession?.academicYearId) return null;
+                      return (
+                        <button
+                          type="button"
+                          onClick={() => handleSelectTargetYear(firstDebtSession.academicYearId)}
+                          className="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold rounded-xl shrink-0 transition-all cursor-pointer shadow-xs whitespace-nowrap"
+                        >
+                          Régler {firstDebtSession.academicYearLabel}
+                        </button>
+                      );
+                    })()}
+                    <button
+                      type="button"
+                      onClick={() => setIsDossierModalOpen(true)}
+                      className="px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold rounded-xl shrink-0 transition-all flex items-center gap-1.5 cursor-pointer shadow-xs whitespace-nowrap"
+                    >
+                      <FileText size={13} /> Examiner le dossier
+                    </button>
+                  </div>
                 </div>
               ) : (
                 !loadingDebt && selectedStudent && (
@@ -4540,7 +4630,7 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
                         <CheckCircle2 className="text-blue-600 mt-0.5 shrink-0" size={16} />
                         <div>
                           <p className="text-[11px] sm:text-xs text-blue-900 font-semibold leading-relaxed">
-                            <strong className="font-bold">Dossier Conforme (Aucun Arriéré) :</strong> L'{terminology.student.toLowerCase()} n'a aucune dette sur les sessions antérieures. Le montant saisi sera imputé directement {selectedStudent.isReenrollment ? 'aux frais de réinscription' : "aux frais d'inscription"} de la session courante ({activeYear?.label || 'Session active'}).
+                            <strong className="font-bold">Dossier Conforme (Aucun Arriéré) :</strong> L'{terminology.student.toLowerCase()} n'a aucune dette sur les sessions antérieures. Le montant saisi sera imputé directement {selectedStudent.isReenrollment ? 'aux frais de réinscription' : "aux frais d'inscription"} de la session ciblée ({(academicYears.find(y => y.id === targetYearId) || activeYear)?.label || 'Session active'}).
                           </p>
                           <p className="text-[10.5px] text-blue-700 mt-0.5">
                             {selectedStudent.isReenrollment ? 'Frais de réinscription de la session : ' : "Frais d'inscription de la session : "}
@@ -4567,7 +4657,7 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
                           <p className="text-[10.5px] text-emerald-700 mt-0.5">
                             {selectedStudent.otherEnrollments.some((e: any) => e.academic_year?.status === 'FUTURE')
                               ? `Élève également pré-inscrit(e) pour la future session (${selectedStudent.otherEnrollments.find((e: any) => e.academic_year?.status === 'FUTURE')?.academic_year?.label || 'Prochaine session'}).`
-                              : `Le versement sera intégralement imputé à la session active (${activeYear?.label || 'Session active'}).`}
+                              : `Le versement sera intégralement imputé à la session sélectionnée (${(academicYears.find(y => y.id === targetYearId) || activeYear)?.label || 'Session active'}).`}
                           </p>
                         </div>
                       </div>
@@ -4617,7 +4707,7 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
               return (
                 <button 
                   type="submit" 
-                  disabled={!selectedStudent || !montantReel || isSubmitting || !activeYear || !!refError || Boolean(isWalletOverdraft)} 
+                  disabled={!selectedStudent || !montantReel || isSubmitting || (!activeYear && !targetYearId) || !!refError || Boolean(isWalletOverdraft)} 
                   className={`w-full py-2.5 sm:py-3 text-white font-bold rounded-xl shadow-xs transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 mt-1 sm:mt-2 cursor-pointer active:scale-98 text-xs sm:text-sm ${
                     paymentMethod === 'MonCash'
                       ? 'bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-700 hover:to-rose-700 shadow-red-600/20'
@@ -4783,7 +4873,7 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
           payerPhone={payerPhoneCustom || referenceNumber || selectedStudent.parent_phone || selectedStudent.phone}
           onPayerPhoneChange={(newPhone) => setPayerPhoneCustom(newPhone)}
           schoolName={schoolDetails?.name || school?.name}
-          academicYearLabel={activeYear?.label || activeYear?.name}
+          academicYearLabel={(academicYears.find(y => y.id === targetYearId) || activeYear)?.label || (academicYears.find(y => y.id === targetYearId) || activeYear)?.name}
           campusName={campuses.find(c => c.id === (selectedStudent.campus_id || currentCampusId))?.name}
           terminology={terminology}
         />
@@ -4955,12 +5045,7 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
         school={school}
         campusName={selectedStudent?.campus_name || campuses?.find(c => c.id === currentCampusId)?.name}
         campuses={campuses}
-        onSelectYear={(yrId) => {
-          setTargetYearId(yrId);
-          if (selectedStudent) {
-            loadStudentDetails(selectedStudent.id, yrId);
-          }
-        }}
+        onSelectYear={handleSelectTargetYear}
       />
     </div>
   );

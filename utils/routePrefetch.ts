@@ -10,7 +10,9 @@ const ROUTE_PREFETCHERS: Record<string, () => Promise<unknown>> = {
   '/settings/utilisateurs': () => import('../components/UserManagementView'),
   '/settings/audit': () => import('../components/AuditLogsView'),
   '/eleves': () => import('../components/StudentList'),
+  '/eleves/detail': () => import('../components/StudentDetailView'),
   '/eleves/ajouter': () => import('../components/StudentForm'),
+  '/eleves/reinscrire': () => import('../components/StudentForm'),
   '/eleves/validation': () => import('../components/ValidationList'),
   '/classes': () => import('../components/ClassManagement'),
   '/notes': () => import('../components/GradesView'),
@@ -35,14 +37,20 @@ const ROUTE_PREFETCHERS: Record<string, () => Promise<unknown>> = {
 export const prefetchRouteChunk = (rawPath: string) => {
   if (typeof navigator !== 'undefined' && !navigator.onLine) return;
   const cleanPath = (rawPath || '').split('?')[0];
-  if (!cleanPath || prefetchedPaths.has(cleanPath)) return;
+  if (!cleanPath) return;
 
-  const loader = ROUTE_PREFETCHERS[cleanPath];
+  const matchedKey = ROUTE_PREFETCHERS[cleanPath]
+    ? cleanPath
+    : Object.keys(ROUTE_PREFETCHERS).find((key) => key !== '/' && cleanPath.startsWith(`${key}/`));
+
+  if (!matchedKey || prefetchedPaths.has(matchedKey)) return;
+
+  const loader = ROUTE_PREFETCHERS[matchedKey];
   if (!loader) return;
 
-  prefetchedPaths.add(cleanPath);
+  prefetchedPaths.add(matchedKey);
   void loader().catch(() => {
-    prefetchedPaths.delete(cleanPath);
+    prefetchedPaths.delete(matchedKey);
   });
 };
 
@@ -57,10 +65,11 @@ export const scheduleIdleRoutePrefetch = () => {
 
   const priorityRoutes = [
     '/offline',
-    '/settings/ecole',
     '/eleves',
-    '/notes',
+    '/eleves/detail',
     '/economat/frais',
+    '/settings/ecole',
+    '/notes',
     '/classes',
   ];
 

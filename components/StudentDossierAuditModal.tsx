@@ -727,11 +727,25 @@ export const StudentDossierAuditModal: React.FC<StudentDossierAuditModalProps> =
                             <span className="text-xs font-black text-slate-900">{session.academicYearLabel}</span>
                             <span className="text-[10px] font-bold text-slate-500 bg-slate-100 px-1.5 py-0.2 rounded">{session.className}</span>
                           </div>
-                          <span className={`px-2 py-0.5 rounded-full text-[9.5px] font-black uppercase ${
-                            session.isSolvent ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'
-                          }`}>
-                            {session.isSolvent ? 'Soldé' : `Dû : ${session.remainingDebt.toLocaleString()} HTG`}
-                          </span>
+                          <div className="flex items-center gap-2">
+                            <span className={`px-2 py-0.5 rounded-full text-[9.5px] font-black uppercase ${
+                              session.isSolvent ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'
+                            }`}>
+                              {session.isSolvent ? 'Soldé' : `Dû : ${session.remainingDebt.toLocaleString()} HTG`}
+                            </span>
+                            {!session.isSolvent && !session.isFutureSession && onSelectYear && session.academicYearId && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  onSelectYear(session.academicYearId);
+                                  onClose();
+                                }}
+                                className="px-2.5 py-1 bg-rose-600 hover:bg-rose-700 text-white text-[10px] font-bold rounded-lg transition-colors cursor-pointer whitespace-nowrap"
+                              >
+                                Régler cette session
+                              </button>
+                            )}
+                          </div>
                         </div>
 
                         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">

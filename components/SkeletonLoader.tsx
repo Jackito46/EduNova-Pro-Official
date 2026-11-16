@@ -51,28 +51,28 @@ export const SkeletonCard: React.FC<{ count?: number }> = ({ count = 3 }) => (
 );
 
 export const FluidLoadingState: React.FC<{ message?: string; subtext?: string }> = ({
-  message = "Chargement des données...",
-  subtext = "Veuillez patienter un instant"
+  message = "Chargement...",
+  subtext
 }) => (
-  <div className="flex flex-col items-center justify-center py-10 md:py-16 px-4 text-center w-full max-w-xl mx-auto">
-    <div className="relative flex items-center justify-center mb-4 md:mb-5">
-      {/* Outer pulsing aura */}
-      <div className="absolute w-14 h-14 md:w-16 md:h-16 bg-blue-500/20 rounded-full animate-ping opacity-75" />
-      {/* Middle rotating gradient ring */}
-      <div className="w-12 h-12 md:w-14 md:h-14 rounded-full border-3 border-transparent border-t-blue-600 border-r-indigo-600 border-b-cyan-500 animate-spin" />
-      {/* Inner glowing core */}
-      <div className="absolute w-7 h-7 md:w-8 md:h-8 bg-gradient-to-tr from-blue-600 to-indigo-600 rounded-full flex items-center justify-center shadow-lg shadow-blue-500/30">
-        <div className="w-2 h-2 md:w-2.5 md:h-2.5 bg-white rounded-full animate-pulse" />
+  <div className="flex flex-col items-center justify-center py-8 md:py-12 px-4 text-center w-full max-w-md mx-auto">
+    <div className="relative flex items-center justify-center mb-3.5">
+      <div className="w-11 h-11 rounded-full border-3 border-slate-100 border-t-blue-600 border-r-indigo-600 animate-spin" />
+      <div className="absolute w-6 h-6 bg-gradient-to-tr from-blue-600 to-indigo-600 rounded-full flex items-center justify-center shadow-sm">
+        <div className="w-2 h-2 bg-white rounded-full" />
       </div>
     </div>
     <motion.h4
-      initial={{ opacity: 0, y: 5 }}
+      initial={{ opacity: 0, y: 4 }}
       animate={{ opacity: 1, y: 0 }}
-      className="text-sm sm:text-base font-bold text-slate-800 tracking-tight leading-snug px-2"
+      className="text-sm sm:text-base font-bold text-slate-900 tracking-tight leading-snug"
     >
       {message}
     </motion.h4>
-    <p className="text-xs md:text-sm text-slate-400 font-medium mt-1.5 max-w-xs sm:max-w-md leading-relaxed">{subtext}</p>
+    {subtext && (
+      <p className="text-xs text-slate-500 font-medium mt-1 max-w-xs leading-relaxed">
+        {subtext}
+      </p>
+    )}
   </div>
 );
 
@@ -96,26 +96,125 @@ const SlowNetworkEscapeBar: React.FC<{ onRetry?: () => void }> = ({ onRetry }) =
   const isAlreadyOfflineRoute = typeof window !== 'undefined' && window.location.hash.includes('/offline');
 
   return (
-    <div className="mt-4 pt-4 border-t border-slate-100 flex flex-wrap items-center justify-center gap-2.5 text-xs">
+    <div className="mt-3 pt-3 border-t border-slate-100 flex flex-wrap items-center justify-center gap-3 text-xs">
       <span className="text-slate-500 font-medium">
-        {isOffline ? 'Connexion hors-ligne détectée.' : 'Chargement plus long que prévu ?'}
+        {isOffline ? 'Réseau indisponible.' : 'Connexion lente détectée.'}
       </span>
       <button
         type="button"
-        onClick={() => (onRetry ? onRetry() : window.dispatchEvent(new CustomEvent('edunova_retry_active_view')))}
-        className="px-3.5 py-1.5 rounded-lg bg-slate-900 text-white font-semibold hover:bg-slate-800 transition-colors cursor-pointer"
+        onClick={() => {
+          if (isOffline && !isAlreadyOfflineRoute) {
+            window.location.hash = '#/offline';
+          } else if (onRetry) {
+            onRetry();
+          } else {
+            window.dispatchEvent(new CustomEvent('edunova_retry_active_view'));
+          }
+        }}
+        className="px-4 py-2 rounded-lg bg-slate-900 text-white font-semibold hover:bg-slate-800 transition-colors cursor-pointer whitespace-nowrap"
       >
-        Réessayer
+        {isOffline && !isAlreadyOfflineRoute ? 'Coffre hors-ligne' : 'Réessayer'}
       </button>
-      {!isAlreadyOfflineRoute && (
-        <button
-          type="button"
-          onClick={() => { window.location.hash = '#/offline'; }}
-          className="px-3.5 py-1.5 rounded-lg bg-rose-50 text-rose-700 border border-rose-200 font-semibold hover:bg-rose-100 transition-colors cursor-pointer"
-        >
-          Coffre Hors-ligne
-        </button>
-      )}
+    </div>
+  );
+};
+
+export const StudentDossierSkeleton: React.FC<{
+  title?: string;
+  onRetry?: () => void;
+}> = ({
+  title = "Ouverture de la fiche élève...",
+  onRetry
+}) => {
+  const [isSlowWait, setIsSlowWait] = React.useState(() =>
+    typeof navigator !== 'undefined' ? !navigator.onLine : false
+  );
+
+  React.useEffect(() => {
+    const timer = setTimeout(() => setIsSlowWait(true), 3000);
+    const onOffline = () => setIsSlowWait(true);
+    window.addEventListener('offline', onOffline);
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener('offline', onOffline);
+    };
+  }, []);
+
+  const isOffline = typeof navigator !== 'undefined' && !navigator.onLine;
+
+  return (
+    <div className="max-w-7xl mx-auto space-y-5 animate-in fade-in duration-200 px-2 sm:px-4 lg:px-6 pb-12">
+      {/* Status bar explicite et épurée (1 ligne, au plus 1 bouton si lent) */}
+      <div className="bg-white rounded-2xl border border-slate-200 px-4 py-3 flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-3 min-w-0">
+          <div className="w-5 h-5 rounded-full border-2 border-slate-200 border-t-blue-600 animate-spin shrink-0" />
+          <div className="min-w-0">
+            <p className="text-sm font-bold text-slate-900 truncate">{title}</p>
+            {(isOffline || isSlowWait) && (
+              <p className="text-xs text-slate-500 truncate">
+                {isOffline ? 'Hors-ligne — cache local requis' : 'Connexion lente, chargement des données...'}
+              </p>
+            )}
+          </div>
+        </div>
+        {(isSlowWait || isOffline) && (
+          <button
+            type="button"
+            onClick={() => {
+              if (isOffline) {
+                window.location.hash = '#/offline';
+              } else if (onRetry) {
+                onRetry();
+              } else {
+                window.dispatchEvent(new CustomEvent('edunova_retry_active_view'));
+              }
+            }}
+            className="px-4 py-2 rounded-lg bg-slate-900 text-white text-xs font-semibold hover:bg-slate-800 transition-colors cursor-pointer whitespace-nowrap shrink-0"
+          >
+            {isOffline ? 'Coffre hors-ligne' : 'Réessayer'}
+          </button>
+        )}
+      </div>
+
+      {/* En-tête fiche élève skeleton */}
+      <div className="bg-white rounded-2xl border border-slate-200 p-5 space-y-4">
+        <div className="flex items-center gap-4">
+          <Skeleton className="h-12 w-12 sm:h-14 sm:w-14 rounded-2xl shrink-0" />
+          <div className="space-y-2 flex-1 max-w-sm">
+            <Skeleton className="h-5 w-3/4" />
+            <Skeleton className="h-3.5 w-1/2" />
+          </div>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 pt-2">
+          {[1, 2, 3, 4].map((i) => (
+            <div key={i} className="p-4 rounded-xl border border-slate-100 bg-slate-50/60 space-y-2.5">
+              <Skeleton className="h-3 w-24" />
+              <Skeleton className="h-6 w-28" />
+              <Skeleton className="h-2.5 w-20" />
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Sections identité & solvabilité skeleton */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+        <div className="lg:col-span-2 bg-white rounded-2xl border border-slate-200 p-5 space-y-4">
+          <Skeleton className="h-4 w-44" />
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
+            {[1, 2, 3, 4].map((k) => (
+              <div key={k} className="space-y-1.5">
+                <Skeleton className="h-2.5 w-20" />
+                <Skeleton className="h-4 w-36" />
+              </div>
+            ))}
+          </div>
+        </div>
+        <div className="bg-white rounded-2xl border border-slate-200 p-5 space-y-3">
+          <Skeleton className="h-4 w-36" />
+          <Skeleton className="h-16 w-full rounded-xl" />
+          <Skeleton className="h-10 w-full rounded-xl" />
+        </div>
+      </div>
     </div>
   );
 };
@@ -127,45 +226,33 @@ export const ModernRegistrySkeleton: React.FC<{
   type?: 'table' | 'cards';
   onRetry?: () => void;
 }> = ({ 
-  title = "Chargement du registre en cours...", 
-  subtitle = "Connexion sécurisée avec la base de données...",
+  title = "Chargement du registre...", 
+  subtitle,
   rows = 6,
   type = 'table',
   onRetry
 }) => (
   <div className="space-y-6 animate-in fade-in duration-300 max-w-7xl mx-auto">
     {/* Banner Skeleton */}
-    <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 p-6 rounded-3xl border border-slate-800 shadow-xl flex flex-col md:flex-row items-center justify-between gap-4">
-      <div className="flex items-center gap-4 w-full md:w-auto">
-        <div className="w-12 h-12 rounded-2xl bg-indigo-600/30 border border-indigo-500/20 flex items-center justify-center animate-pulse shrink-0">
-          <div className="w-6 h-6 rounded-lg bg-indigo-400/40" />
+    <div className="bg-slate-900 p-5 rounded-2xl border border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="flex items-center gap-3.5 min-w-0">
+        <div className="w-9 h-9 rounded-xl bg-indigo-500/20 border border-indigo-400/20 flex items-center justify-center shrink-0">
+          <div className="w-4 h-4 rounded-full border-2 border-indigo-300 border-t-transparent animate-spin" />
         </div>
-        <div className="space-y-2 w-full">
-          <div className="flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
-            <span className="text-xs font-bold text-indigo-300 tracking-wider uppercase">{title}</span>
-          </div>
-          <p className="text-xs text-slate-400 font-medium">{subtitle}</p>
+        <div className="min-w-0">
+          <p className="text-sm font-bold text-white truncate">{title}</p>
+          {subtitle && <p className="text-xs text-slate-400 truncate mt-0.5">{subtitle}</p>}
         </div>
       </div>
-      <div className="flex items-center gap-2 w-full md:w-auto justify-end">
+      {onRetry && (
         <button
           type="button"
-          onClick={() => { window.location.hash = '#/offline'; }}
-          className="px-3.5 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-semibold transition-colors cursor-pointer whitespace-nowrap"
+          onClick={onRetry}
+          className="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold transition-colors cursor-pointer whitespace-nowrap shrink-0 self-end sm:self-auto"
         >
-          Mode Hors-ligne
+          Réessayer
         </button>
-        {onRetry && (
-          <button
-            type="button"
-            onClick={onRetry}
-            className="px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold transition-colors cursor-pointer whitespace-nowrap"
-          >
-            Réessayer
-          </button>
-        )}
-      </div>
+      )}
     </div>
 
     {/* Filter bar Skeleton */}

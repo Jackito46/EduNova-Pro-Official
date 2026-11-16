@@ -28,6 +28,7 @@ import {
 } from '../utils/documentRequirements';
 import { loadEncryptedRefCache, saveEncryptedRefCache } from '../services/offlineEncryptedStore';
 import { isTransientNetworkError } from '../services/offlineSyncEngine';
+import { prefetchRouteChunk } from '../utils/routePrefetch';
 
 const StudentList: React.FC<{ user: UserProfile }> = ({ user }) => {
   const navigate = useNavigate();
@@ -63,6 +64,11 @@ const StudentList: React.FC<{ user: UserProfile }> = ({ user }) => {
   const [docFilter, setDocFilter] = useState<'ALL' | 'COMPLETE' | 'INCOMPLETE' | 'REJECTED'>('ALL');
   const [docModalStudent, setDocModalStudent] = useState<any | null>(null);
   const [showDocModal, setShowDocModal] = useState(false);
+
+  // Préchargement discret de la fiche élève dès l'ouverture du registre
+  useEffect(() => {
+    prefetchRouteChunk('/eleves/detail');
+  }, []);
 
   const fetchInitialData = useCallback(async () => {
     if (!user?.school_id) return;

@@ -9,7 +9,7 @@ import {
   FileCheck2, Clock, XCircle, Smartphone, Wallet, Eye, EyeOff, KeyRound, Sparkles,
   TrendingUp, Receipt, PlusCircle, Check
 } from 'lucide-react';
-import { supabase, supabaseUrl, supabaseAnonKey } from '../supabase';
+import { supabase, supabaseUrl, supabaseAnonKey, withTimeout } from '../supabase';
 import { createClient } from '@supabase/supabase-js';
 
 const secondarySupabase = createClient(supabaseUrl, supabaseAnonKey, {
@@ -40,6 +40,7 @@ import {
 import { isPaymentCompleted, isWalletDeposit } from '../src/utils/payment';
 import { computeCertifiedStudentArrears } from '../utils/studentDebtAudit';
 import { ResponsiveTableWrapper } from './ResponsiveTableWrapper';
+import { StudentDossierSkeleton } from './SkeletonLoader';
 
 const StudentDetailView: React.FC<{ user: UserProfile }> = ({ user }) => {
   const { id } = useParams<{ id: string }>();
@@ -81,19 +82,65 @@ const StudentDetailView: React.FC<{ user: UserProfile }> = ({ user }) => {
     setLoading(true);
     setError(null);
     try {
-      // 1. Fetch Student Basic Info
-      let studentData: any = null;
-      try {
-        const { data, error: sErr } = await supabase
-          .from('students')
-          .select('*, class:classes(*)')
-          .eq('id', studentId)
-          .eq('school_id', user.school_id)
-          .maybeSingle();
-        if (data) studentData = data;
-        else if (sErr && studentId !== 'c3b12a55-d5d1-460b-8a7d-c8eed32a727c') throw sErr;
-      } catch (err: any) {
-        if (studentId !== 'c3b12a55-d5d1-460b-8a7d-c8eed32a727c') throw err;
+      // Chargement 100% parallèle avec garde-fou anti-blocage réseau
+      const [
+        studentRes,
+        auditRes,
+        { data: enrollData },
+        { data: payData, error: payErr },
+        { data: supplyData },
+        { data: discData },
+        { data: rawCampaignData }
+      ] = await withTimeout(
+        Promise.all([
+          supabase
+            .from('students')
+            .select('*, class:classes(*)')
+            .eq('id', studentId)
+            .eq('school_id', user.school_id)
+            .maybeSingle()
+            .then((r) => r, (err) => ({ data: null, error: err })),
+          studentId === 'c3b12a55-d5d1-460b-8a7d-c8eed32a727c'
+            ? Promise.resolve({ totalArrears: 0 })
+            : computeCertifiedStudentArrears({ studentId, schoolId: user.school_id }).catch(() => ({ totalArrears: 0 })),
+          supabase
+            .from('enrollments')
+            .select('*, academic_year:academic_years(*), class:classes(*)')
+            .eq('student_id', studentId)
+            .order('created_at', { ascending: false }),
+          supabase
+            .from('payments')
+            .select('*, campaign:ad_hoc_campaigns(id, name)')
+            .eq('student_id', studentId)
+            .order('created_at', { ascending: false }),
+          supabase
+            .from('school_supplies')
+            .select('*, item:supply_catalog(name)')
+            .eq('student_id', studentId)
+            .eq('school_id', user.school_id)
+            .gt('paid_amount', 0),
+          supabase
+            .from('disciplinary_records')
+            .select('*')
+            .eq('student_id', studentId)
+            .order('incident_date', { ascending: false }),
+          supabase
+            .from('student_ad_hoc_fees')
+            .select(`
+              id,
+              custom_amount,
+              adjustment_reason,
+              campaign:ad_hoc_campaigns!campaign_id(id, name, amount, currency, status, due_date, type, academic_year:academic_year_id(label))
+            `)
+            .eq('student_id', studentId)
+        ]),
+        10000,
+        'Connexion lente lors de l’ouverture de la fiche élève.'
+      );
+
+      let studentData: any = studentRes?.data || null;
+      if (!studentData && studentRes?.error && studentId !== 'c3b12a55-d5d1-460b-8a7d-c8eed32a727c') {
+        throw studentRes.error;
       }
 
       // Profil repère officiel pour l'élève Augustin Djenny si non présent en base
@@ -132,61 +179,7 @@ const StudentDetailView: React.FC<{ user: UserProfile }> = ({ user }) => {
         throw new Error("Dossier introuvable.");
       }
       setStudent(studentData);
-
-      // 1.5 Fetch Certified Global Debt (Multi-tenant & Multi-currency audit)
-      if (studentId === 'c3b12a55-d5d1-460b-8a7d-c8eed32a727c') {
-        setStudentDebt(0);
-      } else {
-        try {
-          const audit = await computeCertifiedStudentArrears({
-            studentId,
-            schoolId: user.school_id
-          });
-          setStudentDebt(audit.totalArrears);
-        } catch (e) {
-          console.warn("Debt fetch failed", e);
-        }
-      }
-
-      // 2. Fetch Enrollments, Payments, Supplies, Disciplinary and Campaigns en parallèle (Zero Bottleneck)
-      const [
-        { data: enrollData },
-        { data: payData, error: payErr },
-        { data: supplyData },
-        { data: discData },
-        { data: rawCampaignData }
-      ] = await Promise.all([
-        supabase
-          .from('enrollments')
-          .select('*, academic_year:academic_years(*), class:classes(*)')
-          .eq('student_id', studentId)
-          .order('created_at', { ascending: false }),
-        supabase
-          .from('payments')
-          .select('*, campaign:ad_hoc_campaigns(id, name)')
-          .eq('student_id', studentId)
-          .order('created_at', { ascending: false }),
-        supabase
-          .from('school_supplies')
-          .select('*, item:supply_catalog(name)')
-          .eq('student_id', studentId)
-          .eq('school_id', user.school_id)
-          .gt('paid_amount', 0),
-        supabase
-          .from('disciplinary_records')
-          .select('*')
-          .eq('student_id', studentId)
-          .order('incident_date', { ascending: false }),
-        supabase
-          .from('student_ad_hoc_fees')
-          .select(`
-            id,
-            custom_amount,
-            adjustment_reason,
-            campaign:ad_hoc_campaigns!campaign_id(id, name, amount, currency, status, due_date, type, academic_year:academic_year_id(label))
-          `)
-          .eq('student_id', studentId)
-      ]);
+      setStudentDebt(auditRes?.totalArrears ?? 0);
 
       if (payErr) {
         console.error("Erreur chargement des versements de l'élève:", payErr);
@@ -342,74 +335,89 @@ const StudentDetailView: React.FC<{ user: UserProfile }> = ({ user }) => {
         }))
       ];
       
-      // Synchronisation en direct des dépôts mobiles Tranzak (MonCash & NatCash)
-      try {
-        const studentFullName = `${studentData.first_name || ''} ${studentData.last_name || ''}`.trim();
-        const token = (await supabase.auth.getSession()).data.session?.access_token;
-        const syncRes = await fetch('/api/tranzak/sync-student-payments', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            ...(token ? { 'Authorization': `Bearer ${token}` } : {})
-          },
-          body: JSON.stringify({
-            studentId: studentId,
-            schoolId: user.school_id,
-            studentName: studentFullName
-          })
-        });
-        if (syncRes.ok) {
-          const syncJson = await syncRes.json().catch(() => ({}));
-          const remoteTxs = Array.isArray(syncJson?.all_transactions)
-            ? syncJson.all_transactions
-            : (Array.isArray(syncJson?.transactions) ? syncJson.transactions : []);
-
-          for (const tx of remoteTxs) {
-            const txRef = tx.reference || tx.metadata?.order_id || tx.transaction_id;
-            const txId = tx.transaction_id || tx.id;
-            const exists = normalizedPayments.some((p: any) =>
-              p.reference_number === txRef ||
-              p.reference_number === txId ||
-              p.id === txId ||
-              p.id === txRef ||
-              p.moncash_order_id === txRef ||
-              p.moncash_transaction_id === txId
-            );
-            if (!exists) {
-              const operator = (tx.payment_method || tx.metadata?.operator || 'moncash').toLowerCase().includes('natcash') ? 'NatCash' : 'MonCash';
-              normalizedPayments.push({
-                id: txId || txRef,
-                date: tx.completed_at || tx.created_at || new Date().toISOString(),
-                label: `Recharge Portefeuille ${operator}`,
-                amount: Number(tx.amount || 0),
-                rawAmount: Number(tx.amount || 0),
-                currency: tx.currency || 'HTG',
-                exchange_rate_applied: 0,
-                status: 'VALIDE',
-                ad_hoc_campaign_id: null,
-                campaign_id: null,
-                campaign: null,
-                receipt_number: txRef || (txId || '').slice(-8).toUpperCase(),
-                reference_number: txRef || txId,
-                payment_method: operator,
-                nature: 'Recharge Portefeuille',
-                fee_type: 'CREDIT_PORTEFEUILLE',
-                notes: tx.description || `Dépôt Portefeuille ${operator}`,
-                phone: tx.customer?.phone || null
-              });
-            }
-          }
-          if (typeof syncJson?.new_balance === 'number' && syncJson.new_balance >= 0) {
-            studentData.wallet_balance_htg = syncJson.new_balance;
-            setStudent((prev: any) => prev ? { ...prev, wallet_balance_htg: syncJson.new_balance } : prev);
-          }
-        }
-      } catch (e) {
-        console.warn('Sync Tranzak in StudentDetailView warning:', e);
-      }
-
       normalizedPayments.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
       setPayments(normalizedPayments);
+
+      // Synchronisation non-bloquante des dépôts mobiles Tranzak (MonCash & NatCash) en arrière-plan
+      if (typeof navigator === 'undefined' || navigator.onLine) {
+        const studentFullName = `${studentData.first_name || ''} ${studentData.last_name || ''}`.trim();
+        void (async () => {
+          const controller = new AbortController();
+          const timer = setTimeout(() => controller.abort(), 4500);
+          try {
+            const token = (await supabase.auth.getSession()).data.session?.access_token;
+            const syncRes = await fetch('/api/tranzak/sync-student-payments', {
+              method: 'POST',
+              signal: controller.signal,
+              headers: {
+                'Content-Type': 'application/json',
+                ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+              },
+              body: JSON.stringify({
+                studentId,
+                schoolId: user.school_id,
+                studentName: studentFullName
+              })
+            });
+            if (!syncRes.ok) return;
+            const syncJson = await syncRes.json().catch(() => ({}));
+            const remoteTxs = Array.isArray(syncJson?.all_transactions)
+              ? syncJson.all_transactions
+              : (Array.isArray(syncJson?.transactions) ? syncJson.transactions : []);
+
+            const extraPayments: any[] = [];
+            for (const tx of remoteTxs) {
+              const txRef = tx.reference || tx.metadata?.order_id || tx.transaction_id;
+              const txId = tx.transaction_id || tx.id;
+              const exists = normalizedPayments.some((p: any) =>
+                p.reference_number === txRef ||
+                p.reference_number === txId ||
+                p.id === txId ||
+                p.id === txRef ||
+                p.moncash_order_id === txRef ||
+                p.moncash_transaction_id === txId
+              );
+              if (!exists) {
+                const operator = (tx.payment_method || tx.metadata?.operator || 'moncash').toLowerCase().includes('natcash') ? 'NatCash' : 'MonCash';
+                extraPayments.push({
+                  id: txId || txRef,
+                  date: tx.completed_at || tx.created_at || new Date().toISOString(),
+                  label: `Recharge Portefeuille ${operator}`,
+                  amount: Number(tx.amount || 0),
+                  rawAmount: Number(tx.amount || 0),
+                  currency: tx.currency || 'HTG',
+                  exchange_rate_applied: 0,
+                  status: 'VALIDE',
+                  ad_hoc_campaign_id: null,
+                  campaign_id: null,
+                  campaign: null,
+                  receipt_number: txRef || (txId || '').slice(-8).toUpperCase(),
+                  reference_number: txRef || txId,
+                  payment_method: operator,
+                  nature: 'Recharge Portefeuille',
+                  fee_type: 'CREDIT_PORTEFEUILLE',
+                  notes: tx.description || `Dépôt Portefeuille ${operator}`,
+                  phone: tx.customer?.phone || null
+                });
+              }
+            }
+            if (extraPayments.length > 0) {
+              setPayments((prev) => {
+                const merged = [...prev, ...extraPayments];
+                merged.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+                return merged;
+              });
+            }
+            if (typeof syncJson?.new_balance === 'number' && syncJson.new_balance >= 0) {
+              setStudent((prev: any) => prev ? { ...prev, wallet_balance_htg: syncJson.new_balance } : prev);
+            }
+          } catch {
+            // Ignorer silencieusement si Tranzak est lent ou hors-ligne
+          } finally {
+            clearTimeout(timer);
+          }
+        })();
+      }
 
       // 4. Disciplinary Records & 5. Ad-Hoc Campaigns (déjà préchargés)
       setDisciplinaryRecords(discData || []);
@@ -742,10 +750,10 @@ const StudentDetailView: React.FC<{ user: UserProfile }> = ({ user }) => {
 
   if (loading) {
     return (
-      <div className="flex flex-col h-[60vh] items-center justify-center">
-        <Loader2 className="animate-spin text-blue-600 mb-4" size={48} />
-        <p className="text-gray-500 font-medium animate-pulse">Chargement du dossier {terminology.student.toLowerCase()}...</p>
-      </div>
+      <StudentDossierSkeleton
+        title={`Ouverture de la fiche ${terminology.student.toLowerCase()}...`}
+        onRetry={() => id && fetchStudentData(id)}
+      />
     );
   }
 

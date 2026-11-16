@@ -17,7 +17,7 @@ import { AiQuotaAlertBanner } from './AiQuotaAlertBanner';
 import { AutonomousAdminWarningBanner } from './AutonomousAdminWarningBanner';
 import { PayrollSensitiveNotificationListener } from './PayrollSensitiveNotificationListener';
 import { GlobalShortcuts } from './GlobalShortcuts';
-import { ModernDashboardSkeleton, FluidLoadingState } from './SkeletonLoader';
+import { ModernDashboardSkeleton, FluidLoadingState, StudentDossierSkeleton } from './SkeletonLoader';
 import { UserProfile, UserRole } from '../types';
 import { lazyWithRetry } from '../utils/lazyWithRetry';
 import { OfflineDashboard } from './OfflineDashboard';
@@ -89,21 +89,28 @@ interface AuthenticatedShellProps {
 }
 
 const getRouteLoadingLabel = (pathname: string): string => {
-  if (pathname.startsWith('/settings/ecole') || pathname === '/settings' || pathname === '/parametres') {
-    return 'Chargement : Identité Établissement...';
+  if (pathname.startsWith('/eleves/detail/')) return 'Ouverture de la fiche élève...';
+  if (pathname.startsWith('/eleves/reinscrire/')) return 'Ouverture de la réinscription...';
+  if (pathname.startsWith('/eleves/modifier/')) return 'Modification du dossier élève...';
+  if (pathname.startsWith('/eleves/ajouter') || pathname.startsWith('/eleves/inscrire')) {
+    return 'Nouvelle inscription...';
   }
-  if (pathname.startsWith('/settings/utilisateurs')) return 'Chargement : Gestion des Utilisateurs...';
-  if (pathname.startsWith('/settings/audit')) return 'Chargement : Journal d’Audit...';
-  if (pathname.startsWith('/eleves')) return 'Chargement : Gestion des Élèves...';
-  if (pathname.startsWith('/classes') || pathname.startsWith('/matieres')) return 'Chargement : Classes & Matières...';
-  if (pathname.startsWith('/notes')) return 'Chargement : Saisie des Notes...';
-  if (pathname.startsWith('/presences')) return 'Chargement : Suivi des Présences...';
-  if (pathname.startsWith('/bulletins')) return 'Chargement : Édition des Bulletins...';
-  if (pathname.startsWith('/economat') || pathname === '/fees') return 'Chargement : Espace Économat & Finance...';
-  if (pathname.startsWith('/personnel')) return 'Chargement : Ressources Humaines...';
-  if (pathname.startsWith('/rapports')) return 'Chargement : Rapports & Bilans...';
-  if (pathname.startsWith('/communication')) return 'Chargement : Communication...';
-  return 'Ouverture de la section...';
+  if (pathname.startsWith('/eleves/validation')) return 'Validation des dossiers...';
+  if (pathname.startsWith('/eleves')) return 'Registre des élèves...';
+  if (pathname.startsWith('/settings/ecole') || pathname === '/settings' || pathname === '/parametres') {
+    return 'Identité Établissement...';
+  }
+  if (pathname.startsWith('/settings/utilisateurs')) return 'Gestion des Utilisateurs...';
+  if (pathname.startsWith('/settings/audit')) return 'Journal d’Audit...';
+  if (pathname.startsWith('/classes') || pathname.startsWith('/matieres')) return 'Classes & Matières...';
+  if (pathname.startsWith('/notes')) return 'Saisie des Notes...';
+  if (pathname.startsWith('/presences')) return 'Suivi des Présences...';
+  if (pathname.startsWith('/bulletins')) return 'Édition des Bulletins...';
+  if (pathname.startsWith('/economat') || pathname === '/fees') return 'Économat & Finance...';
+  if (pathname.startsWith('/personnel')) return 'Ressources Humaines...';
+  if (pathname.startsWith('/rapports')) return 'Rapports & Bilans...';
+  if (pathname.startsWith('/communication')) return 'Communication...';
+  return 'Ouverture...';
 };
 
 const RouteSuspenseFallback: React.FC<{ pathname: string; onRetry: () => void }> = ({ pathname, onRetry }) => {
@@ -112,7 +119,8 @@ const RouteSuspenseFallback: React.FC<{ pathname: string; onRetry: () => void }>
   );
 
   useEffect(() => {
-    const timer = setTimeout(() => setIsSlowWait(true), 2200);
+    setIsSlowWait(typeof navigator !== 'undefined' ? !navigator.onLine : false);
+    const timer = setTimeout(() => setIsSlowWait(true), 3000);
     const onOffline = () => setIsSlowWait(true);
     window.addEventListener('offline', onOffline);
     return () => {
@@ -125,39 +133,37 @@ const RouteSuspenseFallback: React.FC<{ pathname: string; onRetry: () => void }>
     return <ModernDashboardSkeleton onRetry={onRetry} />;
   }
 
+  if (pathname.startsWith('/eleves/detail/')) {
+    return <StudentDossierSkeleton title={getRouteLoadingLabel(pathname)} onRetry={onRetry} />;
+  }
+
   const isOffline = typeof navigator !== 'undefined' && !navigator.onLine;
+  const subtext = isOffline
+    ? 'Hors-ligne — cache local requis'
+    : isSlowWait
+      ? 'Connexion lente, patientez ou réessayez'
+      : undefined;
+
   return (
-    <div className="max-w-3xl mx-auto my-8 bg-white rounded-2xl border border-slate-200/80 shadow-sm p-8 text-center">
+    <div className="max-w-lg mx-auto my-8 bg-white rounded-2xl border border-slate-200 shadow-sm p-6 text-center">
       <FluidLoadingState
         message={getRouteLoadingLabel(pathname)}
-        subtext={
-          isOffline
-            ? 'Connexion hors-ligne : ce module doit être en cache pour s’ouvrir sans réseau.'
-            : 'Préparation de l’interface en cours...'
-        }
+        subtext={subtext}
       />
-      {isSlowWait && (
-        <div className="mt-2 pt-4 border-t border-slate-100 flex flex-wrap items-center justify-center gap-2.5 text-xs">
+      {(isSlowWait || isOffline) && (
+        <div className="pt-2">
           <button
             type="button"
-            onClick={onRetry}
-            className="px-4 py-2 rounded-xl bg-slate-900 text-white font-semibold hover:bg-slate-800 transition-colors cursor-pointer"
+            onClick={() => {
+              if (isOffline) {
+                window.location.hash = '#/offline';
+              } else {
+                onRetry();
+              }
+            }}
+            className="px-4 py-2 rounded-lg bg-slate-900 text-white text-xs font-semibold hover:bg-slate-800 transition-colors cursor-pointer whitespace-nowrap"
           >
-            Réessayer l'ouverture
-          </button>
-          <button
-            type="button"
-            onClick={() => { window.location.hash = '#/offline'; }}
-            className="px-4 py-2 rounded-xl bg-rose-50 text-rose-700 border border-rose-200 font-semibold hover:bg-rose-100 transition-colors cursor-pointer"
-          >
-            Ouvrir le Coffre Hors-ligne
-          </button>
-          <button
-            type="button"
-            onClick={() => { window.location.hash = '#/'; }}
-            className="px-4 py-2 rounded-xl bg-slate-100 text-slate-700 font-semibold hover:bg-slate-200 transition-colors cursor-pointer"
-          >
-            Tableau de Bord
+            {isOffline ? 'Coffre hors-ligne' : 'Réessayer'}
           </button>
         </div>
       )}
