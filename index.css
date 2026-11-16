@@ -51,12 +51,15 @@
 
 html {
   scroll-behavior: smooth;
+  scroll-padding-top: 72px;
+  overflow-x: clip;
 }
 
 body {
   font-family: var(--font-sans);
   background-color: #f8fafc;
   color: #0f172a;
+  overflow-x: clip;
 }
 
 @keyframes edunovaFadeIn {

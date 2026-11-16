@@ -48,6 +48,7 @@ import { toast } from 'sonner';
 import { formatStudentName } from '../utils/formatters';
 import { supabase } from '../supabase';
 import { useSchool } from '../contexts/SchoolContext';
+import { computeCertifiedStudentArrears } from '../utils/studentDebtAudit';
 import { AuditLogger } from '../utils/auditLogger';
 import { useUnsavedChanges } from '../hooks/useUnsavedChanges';
 import { UserProfile } from '../types';
@@ -1168,19 +1169,19 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
     }
     setLoadingDebt(true);
     try {
-      const { data: realDebt, error } = await supabase.rpc('get_student_global_debt', { 
-        p_student_id: studentId,
-        p_exclude_year_id: excludeYearId,
-        p_school_id: user?.school_id
+      const audit = await computeCertifiedStudentArrears({
+        studentId,
+        schoolId: user?.school_id,
+        excludeYearId,
+        exchangeRateFallback: currentExchangeRate
       });
-      if (error) throw error;
-      setGlobalDebt(Number(realDebt || 0));
+      setGlobalDebt(audit.totalArrears);
     } catch (err) {
       console.error("Erreur Audit Solvabilité:", err);
     } finally {
       setLoadingDebt(false);
     }
-  }, [user?.school_id, selectedStudent?.otherEnrollments]);
+  }, [user?.school_id, selectedStudent?.otherEnrollments, currentExchangeRate]);
 
   const loadStudentDetails = useCallback(async (studentId: string, yearId: string) => {
     if (!yearId) return;
@@ -2670,10 +2671,14 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
 
           setSealedReceiptData(frozenSealedReceipt);
           
-          // SYNC STATUS LOGIC: Update student and enrollment status based on results
+          // SYNC STATUS LOGIC: Update student and enrollment status based on certified multi-currency audit
           try {
-            const { data: newDebt } = await supabase.rpc('get_student_global_debt', { p_student_id: selectedStudent.id });
-            const debtValue = Number(newDebt || 0);
+            const audit = await computeCertifiedStudentArrears({
+              studentId: selectedStudent.id,
+              schoolId: user?.school_id,
+              exchangeRateFallback: currentExchangeRate
+            });
+            const debtValue = audit.totalArrears;
 
             // We only auto-promote students who are currently En Attente, Actif or Reliquat
             // We don't touch Inactif or Radié students automatically

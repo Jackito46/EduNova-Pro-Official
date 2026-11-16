@@ -71,6 +71,7 @@ import { AiQuotaAlertBanner } from './AiQuotaAlertBanner';
 import { AddressBarInstallHint } from './AddressBarInstallHint';
 import { isPaymentCompleted, isWalletDeposit } from '../src/utils/payment';
 import { computeFeeCategoryBalance } from '../utils/financeCalculations';
+import { computeCertifiedStudentArrears } from '../utils/studentDebtAudit';
 import { SecretaryDashboardView } from './SecretaryDashboardView';
 import { ParentDashboardView } from './ParentDashboardView';
 import { StudentDashboardGrid } from './StudentDashboardGrid';
@@ -1294,14 +1295,18 @@ const Dashboard: React.FC<{ user: UserProfile }> = ({ user }) => {
           const totalExpected = admBreakdown.effectiveDueHTG + tuitionBreakdown.effectiveDueHTG + miscBreakdown.effectiveDueHTG + campTotalExpected;
           const globalDebt = admBreakdown.remainingHTGEquiv + tuitionBreakdown.remainingHTGEquiv + miscBreakdown.remainingHTGEquiv + campRemaining;
 
-          // Interrogation de l'audit de dette globale officiel par RPC pour conformité totale avec l'Administration
-          let certifiedRpcDebt: number | null = null;
+          // Interrogation de l'audit de dette globale certifié pour conformité totale avec l'Administration
+          let certifiedAuditDebt: number | null = null;
           try {
-            const { data: d } = await supabase.rpc('get_student_global_debt', { p_student_id: studentData.id });
-            if (d !== null && d !== undefined) certifiedRpcDebt = Number(d);
+            const audit = await computeCertifiedStudentArrears({
+              studentId: studentData.id,
+              schoolId: user.school_id,
+              exchangeRateFallback: currentExchangeRate
+            });
+            certifiedAuditDebt = audit.totalArrears;
           } catch (e) {}
 
-          const effectiveGlobalDebt = certifiedRpcDebt !== null ? certifiedRpcDebt : globalDebt;
+          const effectiveGlobalDebt = certifiedAuditDebt !== null ? certifiedAuditDebt : globalDebt;
 
           // Calcul dynamique certifié du portefeuille (Crédits dépôts - Débits règlements)
           const walletCredits = (allStudentPayments || []).filter((p: any) => isPaymentCompleted(p) && isWalletDeposit(p));

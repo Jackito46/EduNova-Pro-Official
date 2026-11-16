@@ -408,7 +408,9 @@ export const PublicLandingPage: React.FC<PublicLandingPageProps> = ({
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [openNavGroup, setOpenNavGroup] = useState<'academic' | 'finance' | 'admin' | null>(null);
   const navRef = useRef<HTMLElement | null>(null);
+  const scrollProgressRef = useRef<HTMLDivElement | null>(null);
   const [scrolled, setScrolled] = useState(false);
+  const [showScrollTop, setShowScrollTop] = useState(false);
   const [activeTab, setActiveTab] = useState<'finance' | 'academic' | 'payroll' | 'parents'>('finance');
   const [previewTab, setPreviewTab] = useState<'receipt' | 'report' | 'offline'>('receipt');
 
@@ -491,11 +493,32 @@ export const PublicLandingPage: React.FC<PublicLandingPageProps> = ({
   }, []);
 
   useEffect(() => {
-    const handleScroll = () => {
-      setScrolled(window.scrollY > 80);
+    let rafId: number | null = null;
+    const syncScrollState = () => {
+      rafId = null;
+      const y = window.scrollY || document.documentElement.scrollTop || 0;
+      setScrolled((prev) => (prev !== (y > 16) ? y > 16 : prev));
+      setShowScrollTop((prev) => (prev !== (y > 280) ? y > 280 : prev));
+      if (scrollProgressRef.current) {
+        const docHeight = document.documentElement.scrollHeight - window.innerHeight;
+        const progress = docHeight > 0 ? Math.min(1, Math.max(0, y / docHeight)) : 0;
+        scrollProgressRef.current.style.transform = `scaleX(${progress.toFixed(4)})`;
+      }
     };
+
+    const handleScroll = () => {
+      if (rafId !== null) return;
+      rafId = window.requestAnimationFrame(syncScrollState);
+    };
+
+    syncScrollState();
     window.addEventListener('scroll', handleScroll, { passive: true });
-    return () => window.removeEventListener('scroll', handleScroll);
+    window.addEventListener('resize', handleScroll, { passive: true });
+    return () => {
+      window.removeEventListener('scroll', handleScroll);
+      window.removeEventListener('resize', handleScroll);
+      if (rafId !== null) window.cancelAnimationFrame(rafId);
+    };
   }, []);
 
   useEffect(() => {
@@ -717,7 +740,7 @@ export const PublicLandingPage: React.FC<PublicLandingPageProps> = ({
     setTimeout(() => {
       const element = document.getElementById(targetId);
       if (element) {
-        const headerOffset = 74;
+        const headerOffset = 68;
         const elementPosition = element.getBoundingClientRect().top;
         const offsetPosition = elementPosition + window.pageYOffset - headerOffset;
         window.scrollTo({
@@ -729,6 +752,8 @@ export const PublicLandingPage: React.FC<PublicLandingPageProps> = ({
   };
 
   const scrollToTop = () => {
+    setMobileMenuOpen(false);
+    setOpenNavGroup(null);
     window.scrollTo({
       top: 0,
       behavior: 'smooth'
@@ -741,15 +766,19 @@ export const PublicLandingPage: React.FC<PublicLandingPageProps> = ({
       style={{ fontFamily: "'Plus Jakarta Sans', system-ui, -apple-system, sans-serif" }}
     >
       {/* =========================================================================
-          1. EN-TÊTE INSTITUTIONNEL GLASSMORPHISM (1 LIGNE · 3 ZONES)
+          1. EN-TÊTE INSTITUTIONNEL ANCRÉ PLEINE LARGEUR (1 LIGNE · 3 ZONES)
          ========================================================================= */}
-      <header className="fixed top-0 inset-x-0 z-50 px-3 sm:px-6 lg:px-8 pt-2 sm:pt-2.5 pointer-events-none">
-        {/* Barre Principale Glassmorphism — Contrat Strict 3 Zones */}
+      <header
+        className={`fixed top-0 inset-x-0 z-50 w-full border-b transition-all duration-300 ease-out bg-gradient-to-r from-[#0f172a] via-[#172554] to-[#1e1b4b] ${
+          scrolled
+            ? 'border-indigo-800/80 shadow-[0_10px_30px_-8px_rgba(15,23,42,0.45),0_4px_12px_-2px_rgba(30,27,75,0.28)]'
+            : 'border-indigo-900/70 shadow-[0_2px_10px_rgba(15,23,42,0.18)]'
+        }`}
+      >
+        {/* Barre Principale — Contrat Strict 3 Zones */}
         <div
-          className={`pointer-events-auto max-w-7xl mx-auto px-3.5 sm:px-5 h-14 sm:h-15 flex items-center justify-between gap-4 sm:gap-6 rounded-2xl border transition-all duration-300 backdrop-blur-xl backdrop-saturate-150 ${
-            scrolled
-              ? 'bg-white/82 border-indigo-200/70 ring-1 ring-slate-900/[0.05] shadow-[0_14px_38px_-8px_rgba(15,23,42,0.14),0_4px_14px_-2px_rgba(67,56,202,0.10),inset_0_1px_0_rgba(255,255,255,0.95)]'
-              : 'bg-white/70 border-white/80 ring-1 ring-slate-900/[0.05] shadow-[0_8px_28px_-6px_rgba(15,23,42,0.09),0_2px_8px_-2px_rgba(67,56,202,0.06),inset_0_1px_0_rgba(255,255,255,0.9)]'
+          className={`max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between gap-4 sm:gap-6 transition-[height] duration-300 ease-out ${
+            scrolled ? 'h-14' : 'h-16'
           }`}
         >
           {/* ZONE 1 : Marque seule sur une ligne (sans badges ni sous-titres parasites) */}
@@ -758,19 +787,19 @@ export const PublicLandingPage: React.FC<PublicLandingPageProps> = ({
             onClick={scrollToTop}
             className="flex items-center gap-2.5 cursor-pointer select-none group shrink-0 text-left"
           >
-            <div className="p-1 rounded-xl bg-white/85 border border-indigo-100/80 shadow-2xs transition-transform duration-200 group-hover:scale-105 shrink-0">
+            <div className="p-1 rounded-xl bg-white border border-white/90 shadow-sm transition-transform duration-200 group-hover:scale-105 shrink-0">
               <Logo size="sm" className="w-7 h-7 block" />
             </div>
-            <span className="text-lg font-extrabold tracking-tight text-slate-900 whitespace-nowrap shrink-0">
-              EduNova <span className="text-indigo-700">Pro</span>
+            <span className="text-lg font-extrabold tracking-tight text-white whitespace-nowrap shrink-0">
+              EduNova <span className="text-amber-400">Pro</span>
             </span>
           </button>
 
-          {/* ZONE 2 : Navigation Regroupée dans une Capsule Verre Dépoli */}
+          {/* ZONE 2 : Navigation Épurée Sans Encadré Gris */}
           <nav
             ref={navRef}
             aria-label="Navigation principale par domaines"
-            className="hidden lg:flex items-center gap-1 text-[13px] font-semibold text-slate-600 bg-slate-900/[0.035] backdrop-blur-md border border-slate-200/70 rounded-xl p-1 shadow-[inset_0_1px_2px_rgba(15,23,42,0.03)]"
+            className="hidden lg:flex items-center gap-1.5 text-[13px] font-semibold"
           >
             {/* Domaine 1 : Académique */}
             <div
@@ -783,24 +812,24 @@ export const PublicLandingPage: React.FC<PublicLandingPageProps> = ({
                 aria-expanded={openNavGroup === 'academic'}
                 aria-haspopup="true"
                 onClick={() => setOpenNavGroup(openNavGroup === 'academic' ? null : 'academic')}
-                className={`px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-all whitespace-nowrap shrink-0 cursor-pointer ${
+                className={`px-3.5 py-2 rounded-lg flex items-center gap-1.5 transition-all whitespace-nowrap shrink-0 cursor-pointer ${
                   openNavGroup === 'academic'
-                    ? 'text-indigo-700 bg-white/95 shadow-xs ring-1 ring-indigo-950/[0.06]'
-                    : 'text-slate-600 hover:text-slate-900 hover:bg-white/75'
+                    ? 'text-white bg-white/15'
+                    : 'text-slate-100 hover:text-white hover:bg-white/10'
                 }`}
               >
                 <span>Académique</span>
                 <ChevronDown
                   size={14}
                   className={`transition-transform duration-150 ${
-                    openNavGroup === 'academic' ? 'rotate-180 text-indigo-600' : 'text-slate-400'
+                    openNavGroup === 'academic' ? 'rotate-180 text-amber-300' : 'text-slate-300'
                   }`}
                 />
               </button>
 
               {openNavGroup === 'academic' && (
-                <div className="absolute left-0 top-full pt-3 w-76 z-50">
-                  <div className="bg-white/88 backdrop-blur-2xl backdrop-saturate-150 border border-white/85 ring-1 ring-slate-900/[0.07] rounded-2xl shadow-[0_20px_50px_-12px_rgba(15,23,42,0.18),0_4px_16px_-4px_rgba(67,56,202,0.10),inset_0_1px_0_rgba(255,255,255,0.95)] p-2 space-y-1">
+                <div className="absolute left-0 top-full pt-2.5 w-76 z-50">
+                  <div className="bg-white border border-slate-200 rounded-2xl shadow-[0_20px_50px_-12px_rgba(15,23,42,0.28),0_4px_16px_-4px_rgba(30,27,75,0.14)] p-2 space-y-1">
                     <div className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-indigo-700">
                       Pôle Académique &amp; Pédagogie
                     </div>
@@ -859,24 +888,24 @@ export const PublicLandingPage: React.FC<PublicLandingPageProps> = ({
                 aria-expanded={openNavGroup === 'finance'}
                 aria-haspopup="true"
                 onClick={() => setOpenNavGroup(openNavGroup === 'finance' ? null : 'finance')}
-                className={`px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-all whitespace-nowrap shrink-0 cursor-pointer ${
+                className={`px-3.5 py-2 rounded-lg flex items-center gap-1.5 transition-all whitespace-nowrap shrink-0 cursor-pointer ${
                   openNavGroup === 'finance'
-                    ? 'text-indigo-700 bg-white/95 shadow-xs ring-1 ring-indigo-950/[0.06]'
-                    : 'text-slate-600 hover:text-slate-900 hover:bg-white/75'
+                    ? 'text-white bg-white/15'
+                    : 'text-slate-100 hover:text-white hover:bg-white/10'
                 }`}
               >
                 <span>Économat</span>
                 <ChevronDown
                   size={14}
                   className={`transition-transform duration-150 ${
-                    openNavGroup === 'finance' ? 'rotate-180 text-indigo-600' : 'text-slate-400'
+                    openNavGroup === 'finance' ? 'rotate-180 text-amber-300' : 'text-slate-300'
                   }`}
                 />
               </button>
 
               {openNavGroup === 'finance' && (
-                <div className="absolute left-0 top-full pt-3 w-76 z-50">
-                  <div className="bg-white/88 backdrop-blur-2xl backdrop-saturate-150 border border-white/85 ring-1 ring-slate-900/[0.07] rounded-2xl shadow-[0_20px_50px_-12px_rgba(15,23,42,0.18),0_4px_16px_-4px_rgba(67,56,202,0.10),inset_0_1px_0_rgba(255,255,255,0.95)] p-2 space-y-1">
+                <div className="absolute left-0 top-full pt-2.5 w-76 z-50">
+                  <div className="bg-white border border-slate-200 rounded-2xl shadow-[0_20px_50px_-12px_rgba(15,23,42,0.28),0_4px_16px_-4px_rgba(30,27,75,0.14)] p-2 space-y-1">
                     <div className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-indigo-700">
                       Pôle Économat &amp; Trésorerie
                     </div>
@@ -935,24 +964,24 @@ export const PublicLandingPage: React.FC<PublicLandingPageProps> = ({
                 aria-expanded={openNavGroup === 'admin'}
                 aria-haspopup="true"
                 onClick={() => setOpenNavGroup(openNavGroup === 'admin' ? null : 'admin')}
-                className={`px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-all whitespace-nowrap shrink-0 cursor-pointer ${
+                className={`px-3.5 py-2 rounded-lg flex items-center gap-1.5 transition-all whitespace-nowrap shrink-0 cursor-pointer ${
                   openNavGroup === 'admin'
-                    ? 'text-indigo-700 bg-white/95 shadow-xs ring-1 ring-indigo-950/[0.06]'
-                    : 'text-slate-600 hover:text-slate-900 hover:bg-white/75'
+                    ? 'text-white bg-white/15'
+                    : 'text-slate-100 hover:text-white hover:bg-white/10'
                 }`}
               >
                 <span>Administration</span>
                 <ChevronDown
                   size={14}
                   className={`transition-transform duration-150 ${
-                    openNavGroup === 'admin' ? 'rotate-180 text-indigo-600' : 'text-slate-400'
+                    openNavGroup === 'admin' ? 'rotate-180 text-amber-300' : 'text-slate-300'
                   }`}
                 />
               </button>
 
               {openNavGroup === 'admin' && (
-                <div className="absolute left-0 top-full pt-3 w-76 z-50">
-                  <div className="bg-white/88 backdrop-blur-2xl backdrop-saturate-150 border border-white/85 ring-1 ring-slate-900/[0.07] rounded-2xl shadow-[0_20px_50px_-12px_rgba(15,23,42,0.18),0_4px_16px_-4px_rgba(67,56,202,0.10),inset_0_1px_0_rgba(255,255,255,0.95)] p-2 space-y-1">
+                <div className="absolute left-0 top-full pt-2.5 w-76 z-50">
+                  <div className="bg-white border border-slate-200 rounded-2xl shadow-[0_20px_50px_-12px_rgba(15,23,42,0.28),0_4px_16px_-4px_rgba(30,27,75,0.14)] p-2 space-y-1">
                     <div className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-indigo-700">
                       Direction, RH &amp; Déploiement
                     </div>
@@ -1003,7 +1032,7 @@ export const PublicLandingPage: React.FC<PublicLandingPageProps> = ({
             <button
               type="button"
               onClick={() => handleNavigate('roi')}
-              className="px-3 py-1.5 rounded-lg text-slate-600 hover:text-slate-900 hover:bg-white/75 transition-all whitespace-nowrap shrink-0 cursor-pointer"
+              className="px-3.5 py-2 rounded-lg text-slate-100 hover:text-white hover:bg-white/10 transition-all whitespace-nowrap shrink-0 cursor-pointer"
             >
               Simulateur
             </button>
@@ -1011,7 +1040,7 @@ export const PublicLandingPage: React.FC<PublicLandingPageProps> = ({
             <button
               type="button"
               onClick={() => handleNavigate('testimonials')}
-              className="px-3 py-1.5 rounded-lg text-slate-600 hover:text-slate-900 hover:bg-white/75 transition-all whitespace-nowrap shrink-0 cursor-pointer"
+              className="px-3.5 py-2 rounded-lg text-slate-100 hover:text-white hover:bg-white/10 transition-all whitespace-nowrap shrink-0 cursor-pointer"
             >
               Témoignages
             </button>
@@ -1026,9 +1055,9 @@ export const PublicLandingPage: React.FC<PublicLandingPageProps> = ({
               onFocus={onPreloadLogin}
               onTouchStart={onPreloadLogin}
               disabled={isOpeningLogin}
-              className="px-4 py-2 text-xs font-bold text-white bg-gradient-to-r from-slate-900 to-indigo-900 hover:from-indigo-700 hover:to-indigo-600 active:scale-[0.98] disabled:opacity-80 rounded-xl border border-white/15 shadow-[0_6px_18px_-4px_rgba(49,46,129,0.4)] transition-all cursor-pointer flex items-center gap-2 whitespace-nowrap shrink-0"
+              className="px-4 py-2 text-xs font-bold text-slate-950 bg-white hover:bg-amber-50 active:scale-[0.98] disabled:opacity-80 rounded-xl border border-white/90 shadow-md transition-all cursor-pointer flex items-center gap-2 whitespace-nowrap shrink-0"
             >
-              <Lock size={13} className="text-indigo-200 shrink-0" />
+              <Lock size={13} className="text-indigo-700 shrink-0" />
               <span>{isOpeningLogin ? 'Ouverture...' : 'Connexion'}</span>
             </button>
           </div>
@@ -1042,14 +1071,14 @@ export const PublicLandingPage: React.FC<PublicLandingPageProps> = ({
               onFocus={onPreloadLogin}
               onTouchStart={onPreloadLogin}
               disabled={isOpeningLogin}
-              className="px-3 py-1.5 text-xs font-bold text-white bg-gradient-to-r from-slate-900 to-indigo-900 hover:from-indigo-700 hover:to-indigo-600 disabled:opacity-80 rounded-xl border border-white/15 shadow-xs whitespace-nowrap shrink-0 cursor-pointer"
+              className="px-3 py-1.5 text-xs font-bold text-slate-950 bg-white hover:bg-amber-50 disabled:opacity-80 rounded-xl border border-white/90 shadow-sm whitespace-nowrap shrink-0 cursor-pointer"
             >
               {isOpeningLogin ? 'Ouverture...' : 'Connexion'}
             </button>
             <button
               type="button"
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="p-2 text-slate-700 hover:text-slate-950 hover:bg-white/80 border border-transparent hover:border-slate-200/80 rounded-xl cursor-pointer transition-colors"
+              className="p-2 text-white hover:bg-white/15 border border-white/15 rounded-xl cursor-pointer transition-colors"
               aria-label="Ouvrir le menu de navigation"
             >
               {mobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
@@ -1057,11 +1086,12 @@ export const PublicLandingPage: React.FC<PublicLandingPageProps> = ({
           </div>
         </div>
 
-        {/* Tiroir de Navigation Mobile Glassmorphism */}
+        {/* Tiroir de Navigation Mobile Solide & Lisible */}
         {mobileMenuOpen && (
           <div
-            className="pointer-events-auto lg:hidden mt-2 max-w-7xl mx-auto rounded-2xl bg-white/90 backdrop-blur-2xl backdrop-saturate-150 border border-white/85 ring-1 ring-slate-900/[0.07] shadow-[0_22px_48px_-10px_rgba(15,23,42,0.20),0_4px_16px_-4px_rgba(67,56,202,0.10),inset_0_1px_0_rgba(255,255,255,0.95)] px-4 py-4 space-y-4 text-xs text-slate-700 overflow-y-auto max-h-[calc(100vh-5.5rem)] edunova-fade-in"
+            className="lg:hidden border-t border-slate-200 bg-white shadow-[0_20px_40px_-12px_rgba(15,23,42,0.22)] px-4 sm:px-6 py-4 text-xs text-slate-700 overflow-y-auto max-h-[calc(100vh-4rem)] edunova-fade-in"
           >
+            <div className="max-w-7xl mx-auto space-y-4">
               <button
                 type="button"
                 onClick={() => {
@@ -1202,14 +1232,27 @@ export const PublicLandingPage: React.FC<PublicLandingPageProps> = ({
                   </a>
                 </div>
               </div>
+            </div>
           </div>
         )}
+
+        {/* Barre de progression fluide au défilement */}
+        <div
+          aria-hidden="true"
+          className="absolute bottom-0 inset-x-0 h-[2px] bg-transparent overflow-hidden pointer-events-none"
+        >
+          <div
+            ref={scrollProgressRef}
+            className="h-full w-full origin-left bg-gradient-to-r from-amber-400 via-sky-400 to-indigo-400 transition-opacity duration-200 will-change-transform"
+            style={{ transform: 'scaleX(0)', opacity: scrolled ? 1 : 0 }}
+          />
+        </div>
       </header>
 
       {/* =========================================================================
           2. CORPS PRINCIPAL — ARCHITECTURE ÉDITORIALE & VITRINE INTERACTIVE
          ========================================================================= */}
-      <main className="pt-[4.25rem] sm:pt-[4.75rem] lg:pt-20 flex-grow">
+      <main className="pt-16 flex-grow">
         {/* HERO SECTION — SANS COUPURE DE TITRE + PHOTOGRAPHIE INSTITUTIONNELLE */}
         <section className="relative pt-4 pb-7 sm:pt-5 sm:pb-9 lg:pt-6 lg:pb-10 bg-gradient-to-b from-white via-slate-50/80 to-slate-100/60 border-b border-slate-200/80 overflow-hidden">
           <div
@@ -2997,7 +3040,7 @@ export const PublicLandingPage: React.FC<PublicLandingPageProps> = ({
 
       {/* Boutons Flottants Sobres (WhatsApp & Retour en Haut) */}
       <div className="fixed bottom-4 right-4 sm:bottom-5 sm:right-5 z-40 flex flex-col items-center gap-2">
-        {scrolled && (
+        {showScrollTop && (
           <button
             type="button"
             onClick={scrollToTop}

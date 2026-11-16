@@ -38,6 +38,7 @@ import {
   calculateDocumentsCompleteness 
 } from '../utils/documentRequirements';
 import { isPaymentCompleted, isWalletDeposit } from '../src/utils/payment';
+import { computeCertifiedStudentArrears } from '../utils/studentDebtAudit';
 import { ResponsiveTableWrapper } from './ResponsiveTableWrapper';
 
 const StudentDetailView: React.FC<{ user: UserProfile }> = ({ user }) => {
@@ -132,13 +133,16 @@ const StudentDetailView: React.FC<{ user: UserProfile }> = ({ user }) => {
       }
       setStudent(studentData);
 
-      // 1.5 Fetch Global Debt
+      // 1.5 Fetch Certified Global Debt (Multi-tenant & Multi-currency audit)
       if (studentId === 'c3b12a55-d5d1-460b-8a7d-c8eed32a727c') {
         setStudentDebt(0);
       } else {
         try {
-          const { data: debt } = await supabase.rpc('get_student_global_debt', { p_student_id: studentId });
-          setStudentDebt(Number(debt || 0));
+          const audit = await computeCertifiedStudentArrears({
+            studentId,
+            schoolId: user.school_id
+          });
+          setStudentDebt(audit.totalArrears);
         } catch (e) {
           console.warn("Debt fetch failed", e);
         }

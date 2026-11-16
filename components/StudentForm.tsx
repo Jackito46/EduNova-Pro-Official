@@ -21,6 +21,7 @@ import { studentSchema } from '../utils/validation';
 import { normalizeIdentifier, displayIdentifier } from '../utils/authHelpers';
 import { formatStudentName, getDefiniteArticle } from '../utils/formatters';
 import { getAllowedClassesForReenrollment, getClassAgeRange, ACADEMIC_PATH, getNextClassLevel } from '../utils/academicPath';
+import { computeCertifiedStudentArrears } from '../utils/studentDebtAudit';
 import { 
   getDocumentDefinitionsForSchoolType, 
   normalizeStudentDocuments, 
@@ -407,26 +408,30 @@ const StudentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
       const currentActive = years.find(y => y.status === 'ACTIVE' || y.is_active) || allYears.find(y => y.status === 'ACTIVE' || y.is_active);
       setActiveYear(currentActive);
 
+      let resolvedTargetYearId = '';
       // Par défaut, si on réinscrit, on cherche d'abord la session FUTURE / PLANIFIÉE / EN PRÉPARATION, sinon la suivante dans la liste, sinon l'active
       if (isReenroll) {
         const futureYear = years.find(y => y.status === 'FUTURE' || y.status === 'PLANIFIEE' || y.status === 'PREPARATION');
         if (futureYear) {
-          setTargetYearId(futureYear.id);
+          resolvedTargetYearId = futureYear.id;
         } else if (currentActive) {
           const activeIdx = years.findIndex(y => y.id === currentActive.id);
           const nextYear = years[activeIdx + 1];
           if (nextYear) {
-            setTargetYearId(nextYear.id);
+            resolvedTargetYearId = nextYear.id;
           } else {
-            setTargetYearId(currentActive.id);
+            resolvedTargetYearId = currentActive.id;
           }
         } else if (years.length > 0) {
-          setTargetYearId(years[0].id);
+          resolvedTargetYearId = years[0].id;
         }
       } else if (currentActive) {
-        setTargetYearId(currentActive.id);
+        resolvedTargetYearId = currentActive.id;
       } else if (years.length > 0) {
-        setTargetYearId(years[0].id);
+        resolvedTargetYearId = years[0].id;
+      }
+      if (resolvedTargetYearId) {
+        setTargetYearId(resolvedTargetYearId);
       }
 
       if (classesRes.data) setDbClasses(classesRes.data);
@@ -444,14 +449,16 @@ const StudentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
 
           let debtValue = 0;
           try {
-            const { data: realDebt, error: rpcError } = await supabase.rpc('get_student_global_debt', { p_student_id: id });
-            if (rpcError) {
-              console.warn("RPC get_student_global_debt failed, falling back to 0", rpcError);
-            }
-            debtValue = Number(realDebt || 0);
+            const audit = await computeCertifiedStudentArrears({
+              studentId: id,
+              schoolId: user.school_id,
+              excludeYearId: isReenroll ? (resolvedTargetYearId || undefined) : undefined,
+              exchangeRateFallback: rateRes.data?.[0]?.rate ? Number(rateRes.data[0].rate) : exchangeRate
+            });
+            debtValue = audit.totalArrears;
             setStudentDebt(debtValue);
           } catch (e) {
-            console.warn("Exception calling get_student_global_debt", e);
+            console.warn("Exception computing certified student arrears", e);
             setStudentDebt(0);
           }
           
@@ -585,7 +592,7 @@ const StudentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
 
   useEffect(() => { loadReferenceData(); }, [loadReferenceData]);
 
-  // Charger les tarifs dès que l'année cible change
+  // Charger les tarifs et réévaluer les arriérés certifiés dès que l'année cible change
   useEffect(() => {
     const fetchFees = async () => {
       if (!targetYearId) return;
@@ -593,7 +600,26 @@ const StudentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
       if (data) setDbFees(data);
     };
     fetchFees();
-  }, [targetYearId]);
+
+    if (isReenroll && id && user.school_id && targetYearId) {
+      let cancelled = false;
+      computeCertifiedStudentArrears({
+        studentId: id,
+        schoolId: user.school_id,
+        excludeYearId: targetYearId,
+        exchangeRateFallback: exchangeRate
+      }).then((audit) => {
+        if (cancelled) return;
+        setStudentDebt(audit.totalArrears);
+        setReenrollEvaluation((prev) => ({
+          ...prev,
+          studentDebt: audit.totalArrears,
+          isFinancialCleared: audit.totalArrears <= 0
+        }));
+      }).catch(() => {});
+      return () => { cancelled = true; };
+    }
+  }, [targetYearId, isReenroll, id, user.school_id, exchangeRate]);
 
   // Filtrage des classes selon le campus/annexe sélectionné et le cycle
   const classesForStep = useMemo(() => {
