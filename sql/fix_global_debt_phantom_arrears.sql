@@ -4,19 +4,38 @@
 -- Élimine définitivement les arriérés fantômes (ex: 2 500 G lors de la réinscription
 -- alors que le dossier est soldé à 100%) dans `get_student_real_balance` et
 -- `get_student_global_debt` pour l'ensemble des établissements :
---   1. Distingue chronologiquement Inscription (1ère session) vs Réinscription (suivantes)
---      sans être faussé par une pré-inscription sur une session FUTURE.
---   2. Prend en compte `student_ad_hoc_fees.custom_amount`, les devises USD des campagnes
---      et reconnaît les versements de campagne même par nom/type de campagne (ex: ASSURANCE).
---   3. Exclut les recharges de portefeuille (CREDIT_PORTEFEUILLE / WALLET_TOPUP),
---      achats de fournitures (FOURNITURE), paiements annulés/rejetés/en attente.
---   4. Attribue les paiements non tagués (`academic_year_id IS NULL`) lorsqu'une seule
---      session historique/active existe.
---   5. Applique la réconciliation comptable globale multi-devises : si le total encaissé
---      couvre l'engagement contractuel net (à <= 50 HTG d'arrondi), l'arriéré est 0.
+--   0. Sécurise toutes les colonnes optionnelles (students.is_foreign,
+--      fee_plans.foreign_tuition_fee, etc.) pour éviter tout échec SQL/PostgREST.
+--   1. Rattache automatiquement les anciens versements de campagnes mal étiquetés
+--      (`fee_type = 'DIVERS'`) à leur campagne ad-hoc sur toutes les écoles.
+--   2. Distingue chronologiquement Inscription (1ère session) vs Réinscription (suivantes)
+--      par extraction d'année sur 4 chiffres, sans être faussé par une session FUTURE.
+--   3. Dédoublonne les inscriptions et assignations de campagnes par session/campagne.
+--   4. Exclut les recharges de portefeuille, achats de fournitures, et tous les
+--      paiements annulés, rejetés, échoués ou en attente.
+--   5. Attribue les paiements non tagués (`academic_year_id IS NULL`) à la dernière
+--      session auditable et applique la réconciliation comptable globale (<= 50 HTG).
 -- ==============================================================================
 
--- 0. Garantir l'existence des colonnes optionnelles sur les bases plus anciennes
+-- 0. Garantir l'existence de TOUTES les colonnes optionnelles sur l'ensemble des bases
+ALTER TABLE public.students ADD COLUMN IF NOT EXISTS discount_amount NUMERIC DEFAULT 0;
+ALTER TABLE public.students ADD COLUMN IF NOT EXISTS is_foreign BOOLEAN DEFAULT false;
+
+ALTER TABLE public.enrollments ADD COLUMN IF NOT EXISTS tuition_discount NUMERIC DEFAULT 0;
+ALTER TABLE public.enrollments ADD COLUMN IF NOT EXISTS tuition_addition NUMERIC DEFAULT 0;
+
+ALTER TABLE public.fee_plans ADD COLUMN IF NOT EXISTS inscription_fee_usd NUMERIC DEFAULT 0;
+ALTER TABLE public.fee_plans ADD COLUMN IF NOT EXISTS reenrollment_fee NUMERIC DEFAULT 0;
+ALTER TABLE public.fee_plans ADD COLUMN IF NOT EXISTS reenrollment_fee_usd NUMERIC DEFAULT 0;
+ALTER TABLE public.fee_plans ADD COLUMN IF NOT EXISTS is_misc_mandatory BOOLEAN DEFAULT false;
+ALTER TABLE public.fee_plans ADD COLUMN IF NOT EXISTS misc_fee_htg NUMERIC DEFAULT 0;
+ALTER TABLE public.fee_plans ADD COLUMN IF NOT EXISTS misc_fee_usd NUMERIC DEFAULT 0;
+ALTER TABLE public.fee_plans ADD COLUMN IF NOT EXISTS tuition_fee_usd NUMERIC DEFAULT 0;
+ALTER TABLE public.fee_plans ADD COLUMN IF NOT EXISTS foreign_tuition_fee NUMERIC DEFAULT 0;
+
+ALTER TABLE public.ad_hoc_campaigns ADD COLUMN IF NOT EXISTS currency TEXT DEFAULT 'HTG';
+ALTER TABLE public.student_ad_hoc_fees ADD COLUMN IF NOT EXISTS custom_amount NUMERIC;
+
 ALTER TABLE public.payments ADD COLUMN IF NOT EXISTS description TEXT;
 ALTER TABLE public.payments ADD COLUMN IF NOT EXISTS nature TEXT;
 ALTER TABLE public.payments ADD COLUMN IF NOT EXISTS type TEXT DEFAULT 'Scolarité';
@@ -26,8 +45,49 @@ ALTER TABLE public.payments ADD COLUMN IF NOT EXISTS currency TEXT DEFAULT 'HTG'
 ALTER TABLE public.payments ADD COLUMN IF NOT EXISTS exchange_rate_applied NUMERIC;
 ALTER TABLE public.payments ADD COLUMN IF NOT EXISTS amount_htg_equivalent NUMERIC;
 ALTER TABLE public.payments ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'VALIDE';
+ALTER TABLE public.payments ADD COLUMN IF NOT EXISTS moncash_status TEXT;
 ALTER TABLE public.payments ADD COLUMN IF NOT EXISTS payment_method TEXT;
-ALTER TABLE public.student_ad_hoc_fees ADD COLUMN IF NOT EXISTS custom_amount NUMERIC;
+ALTER TABLE public.payments ADD COLUMN IF NOT EXISTS notes TEXT;
+
+-- 0b. Réconciliation rétroactive des versements de campagnes mal étiquetés en 'DIVERS' (toutes écoles)
+UPDATE public.payments
+SET fee_type = 'AD_HOC'
+WHERE (
+    ad_hoc_campaign_id IS NOT NULL
+    OR COALESCE(nature, '') ILIKE '%campagne%'
+    OR COALESCE(type, '') ILIKE '%campagne%'
+    OR COALESCE(description, '') ILIKE '%campagne%'
+    OR COALESCE(nature, '') ILIKE '%adhoc%'
+    OR COALESCE(nature, '') ILIKE '%ad-hoc%'
+)
+  AND COALESCE(UPPER(fee_type), '') IN ('DIVERS', 'MISC', '');
+
+UPDATE public.payments p
+SET ad_hoc_campaign_id = matched.campaign_id,
+    fee_type = 'AD_HOC'
+FROM (
+    SELECT DISTINCT ON (p2.id)
+        p2.id AS payment_id,
+        ac.id AS campaign_id
+    FROM public.payments p2
+    JOIN public.student_ad_hoc_fees saf ON saf.student_id = p2.student_id
+    JOIN public.ad_hoc_campaigns ac ON ac.id = saf.campaign_id
+    WHERE p2.ad_hoc_campaign_id IS NULL
+      AND COALESCE(UPPER(p2.fee_type), '') IN ('DIVERS', 'MISC', 'AD_HOC', 'CAMPAGNE', 'CAMPAIGN', '')
+      AND (p2.academic_year_id IS NULL OR ac.academic_year_id IS NULL OR p2.academic_year_id = ac.academic_year_id)
+      AND (
+          COALESCE(p2.nature, '') ILIKE '%' || ac.name || '%'
+          OR COALESCE(p2.description, '') ILIKE '%' || ac.name || '%'
+          OR COALESCE(p2.notes, '') ILIKE '%' || ac.name || '%'
+          OR (ac.name ILIKE '%assurance%' AND (
+              COALESCE(p2.nature, '') ILIKE '%assurance%'
+              OR COALESCE(p2.description, '') ILIKE '%assurance%'
+              OR COALESCE(p2.notes, '') ILIKE '%assurance%'
+          ))
+      )
+    ORDER BY p2.id, ac.created_at DESC NULLS LAST
+) matched
+WHERE p.id = matched.payment_id;
 
 DROP FUNCTION IF EXISTS public.get_student_global_debt(uuid);
 DROP FUNCTION IF EXISTS public.get_student_global_debt(uuid, uuid);
@@ -49,7 +109,7 @@ DECLARE
     v_fee_plan RECORD;
     v_enrollment RECORD;
     v_has_previous_enrollment BOOLEAN := false;
-    v_is_single_year_student BOOLEAN := false;
+    v_is_latest_auditable_year BOOLEAN := false;
 
     v_adm_due_htg NUMERIC := 0;
     v_adm_due_usd NUMERIC := 0;
@@ -92,6 +152,8 @@ DECLARE
     v_is_camp_match BOOLEAN;
     v_year_created_at TIMESTAMPTZ;
     v_year_label TEXT;
+    v_year_start_num INTEGER := 0;
+    v_latest_auditable_year_id UUID;
 BEGIN
     SELECT school_id, COALESCE(discount_amount, 0), COALESCE(is_foreign, false), class_id
     INTO v_school_id, v_student_discount, v_is_foreign, v_class_id
@@ -115,6 +177,10 @@ BEGIN
         WHERE id = v_academic_year_id AND school_id = v_school_id;
     END IF;
 
+    IF v_year_label IS NOT NULL THEN
+        v_year_start_num := COALESCE((regexp_match(v_year_label, '(\d{4})'))[1]::integer, 0);
+    END IF;
+
     BEGIN
         v_current_rate := COALESCE(public.get_current_exchange_rate(v_school_id), 135.0);
     EXCEPTION WHEN OTHERS THEN
@@ -127,18 +193,21 @@ BEGIN
         v_current_rate := 135.0;
     END IF;
 
+    -- Dédoublonner l'inscription pour cette année en prenant la plus récente non annulée
     SELECT * INTO v_enrollment
     FROM public.enrollments
     WHERE student_id = p_student_id
       AND school_id = v_school_id
       AND academic_year_id = v_academic_year_id
+      AND COALESCE(UPPER(status), '') NOT IN ('ANNULE', 'ANNULÉ', 'CANCELLED')
+    ORDER BY created_at DESC NULLS LAST
     LIMIT 1;
 
     IF v_enrollment.id IS NOT NULL THEN
         v_class_id := v_enrollment.class_id;
     END IF;
 
-    -- Rang chronologique réel : vérifier uniquement les inscriptions STRICTEMENT antérieures
+    -- Rang chronologique réel : vérifier uniquement les inscriptions STRICTEMENT antérieures (PAST ou ACTIVE)
     SELECT EXISTS (
         SELECT 1
         FROM public.enrollments e
@@ -146,19 +215,28 @@ BEGIN
         WHERE e.student_id = p_student_id
           AND e.school_id = v_school_id
           AND e.academic_year_id IS DISTINCT FROM v_academic_year_id
-          AND ay.status IN ('PAST', 'ACTIVE')
+          AND COALESCE(UPPER(e.status), '') NOT IN ('ANNULE', 'ANNULÉ', 'CANCELLED')
+          AND (ay.status IN ('PAST', 'ACTIVE') OR ay.is_active = true)
           AND (
-            (v_year_label IS NOT NULL AND ay.label < v_year_label)
-            OR (v_year_label IS NULL AND e.created_at < COALESCE(v_enrollment.created_at, NOW()))
+            (v_year_start_num > 0 AND COALESCE((regexp_match(ay.label, '(\d{4})'))[1]::integer, 0) > 0
+             AND COALESCE((regexp_match(ay.label, '(\d{4})'))[1]::integer, 0) < v_year_start_num)
+            OR ((v_year_start_num = 0 OR COALESCE((regexp_match(ay.label, '(\d{4})'))[1]::integer, 0) = 0)
+                AND e.created_at < COALESCE(v_enrollment.created_at, NOW()))
           )
     ) INTO v_has_previous_enrollment;
 
-    SELECT (COUNT(*) = 1) INTO v_is_single_year_student
+    -- Identifier la session PAST/ACTIVE la plus récente pour y rattacher les paiements sans academic_year_id
+    SELECT e.academic_year_id INTO v_latest_auditable_year_id
     FROM public.enrollments e
     JOIN public.academic_years ay ON ay.id = e.academic_year_id
     WHERE e.student_id = p_student_id
       AND e.school_id = v_school_id
-      AND ay.status IN ('PAST', 'ACTIVE');
+      AND COALESCE(UPPER(e.status), '') NOT IN ('ANNULE', 'ANNULÉ', 'CANCELLED')
+      AND (ay.status IN ('PAST', 'ACTIVE') OR ay.is_active = true)
+    ORDER BY COALESCE((regexp_match(ay.label, '(\d{4})'))[1]::integer, 0) DESC, e.created_at DESC NULLS LAST
+    LIMIT 1;
+
+    v_is_latest_auditable_year := (v_academic_year_id IS NOT NULL AND v_academic_year_id = v_latest_auditable_year_id);
 
     IF v_class_id IS NOT NULL AND v_academic_year_id IS NOT NULL THEN
         SELECT * INTO v_fee_plan
@@ -204,23 +282,30 @@ BEGIN
         END IF;
     END IF;
 
-    -- Exigences de campagnes ad-hoc (respectant custom_amount et devise USD/HTG)
+    -- Exigences de campagnes ad-hoc dédoublonnées par campagne (respectant custom_amount et devise USD/HTG)
     IF v_academic_year_id IS NOT NULL THEN
-        SELECT COALESCE(SUM(
-            CASE
-                WHEN UPPER(COALESCE(c.currency, 'HTG')) = 'USD'
-                    THEN COALESCE(s.custom_amount, c.amount, 0) * v_current_rate
-                ELSE COALESCE(s.custom_amount, c.amount, 0)
-            END
-        ), 0) INTO v_adhoc_due_htg
-        FROM public.student_ad_hoc_fees s
-        JOIN public.ad_hoc_campaigns c ON s.campaign_id = c.id
-        WHERE s.student_id = p_student_id
-          AND s.school_id = v_school_id
-          AND c.academic_year_id = v_academic_year_id;
+        SELECT COALESCE(SUM(camp_due_htg), 0) INTO v_adhoc_due_htg
+        FROM (
+            SELECT DISTINCT ON (s.campaign_id)
+                CASE
+                    WHEN UPPER(COALESCE(c.currency, 'HTG')) = 'USD'
+                        THEN COALESCE(s.custom_amount, c.amount, 0) * v_current_rate
+                    ELSE COALESCE(s.custom_amount, c.amount, 0)
+                END AS camp_due_htg
+            FROM public.student_ad_hoc_fees s
+            JOIN public.ad_hoc_campaigns c ON s.campaign_id = c.id
+            WHERE s.student_id = p_student_id
+              AND (s.school_id = v_school_id OR s.school_id IS NULL)
+              AND (c.school_id = v_school_id OR c.school_id IS NULL)
+              AND (
+                  c.academic_year_id = v_academic_year_id
+                  OR (c.academic_year_id IS NULL AND v_is_latest_auditable_year)
+              )
+            ORDER BY s.campaign_id, s.created_at DESC NULLS LAST
+        ) dedup_campaigns;
     END IF;
 
-    -- Parcourir les paiements validés réels (en excluant recharges portefeuille, fournitures et annulés)
+    -- Parcourir les paiements validés réels (en excluant recharges portefeuille, fournitures, annulés, rejetés et en attente)
     FOR r_pay IN
         SELECT
             p.id,
@@ -228,6 +313,7 @@ BEGIN
             p.type,
             p.nature,
             p.description,
+            p.notes,
             p.ad_hoc_campaign_id,
             p.currency,
             p.amount,
@@ -239,13 +325,40 @@ BEGIN
           AND (
             v_academic_year_id IS NULL
             OR p.academic_year_id = v_academic_year_id
-            OR (v_is_single_year_student AND p.academic_year_id IS NULL)
+            OR (
+                v_is_latest_auditable_year
+                AND (
+                    p.academic_year_id IS NULL
+                    OR NOT EXISTS (
+                        SELECT 1 FROM public.enrollments e_chk
+                        WHERE e_chk.student_id = p_student_id
+                          AND e_chk.academic_year_id = p.academic_year_id
+                          AND COALESCE(UPPER(e_chk.status), '') NOT IN ('ANNULE', 'ANNULÉ', 'CANCELLED')
+                    )
+                )
+            )
           )
-          AND (p.status IS NULL OR (UPPER(p.status) NOT IN ('ANNULE', 'ANNULÉ', 'REJETE', 'REJETÉ', 'CANCELLED')))
-          AND (p.payment_method IS NULL OR (p.payment_method NOT ILIKE '%EN ATTENTE%' AND p.payment_method NOT ILIKE '%REJET%'))
-          AND COALESCE(UPPER(p.fee_type), '') NOT IN ('CREDIT_PORTEFEUILLE', 'WALLET_TOPUP', 'FOURNITURE', 'SUPPLIES')
+          AND (p.status IS NULL OR UPPER(TRIM(p.status)) NOT IN (
+              'ANNULE', 'ANNULÉ', 'REJETE', 'REJETÉ', 'CANCELLED', 'CANCELED',
+              'EN_ATTENTE', 'EN ATTENTE', 'PENDING', 'ECHOUE', 'ÉCHOUÉ', 'FAILED', 'ECHEC', 'ÉCHEC', 'REFUSED'
+          ))
+          AND (p.moncash_status IS NULL OR UPPER(TRIM(p.moncash_status)) NOT IN (
+              'PENDING', 'CANCELLED', 'CANCELED', 'FAILED', 'REJECTED', 'REJETE'
+          ))
+          AND (p.payment_method IS NULL OR (
+              p.payment_method NOT ILIKE '%EN ATTENTE%'
+              AND p.payment_method NOT ILIKE '%REJET%'
+              AND p.payment_method NOT ILIKE '%ANNUL%'
+          ))
+          AND COALESCE(UPPER(p.fee_type), '') NOT IN (
+              'CREDIT_PORTEFEUILLE', 'RECHARGE_PORTEFEUILLE', 'PORTEFEUILLE', 'WALLET_TOPUP',
+              'FOURNITURE', 'SUPPLIES'
+          )
+          AND COALESCE(UPPER(p.fee_type), '') NOT LIKE '%PORTEFEUILLE%'
           AND COALESCE(p.nature, '') NOT ILIKE '%portefeuille%'
           AND COALESCE(p.nature, '') NOT ILIKE '%recharge%'
+          AND COALESCE(p.description, '') NOT ILIKE '%recharge portefeuille%'
+          AND COALESCE(p.description, '') NOT ILIKE '%alimentation portefeuille%'
     LOOP
         p_amount := COALESCE(r_pay.amount, 0);
         p_rate := CASE WHEN COALESCE(r_pay.exchange_rate_applied, 0) > 1 THEN r_pay.exchange_rate_applied ELSE v_current_rate END;
@@ -260,18 +373,24 @@ BEGIN
             p_usd_val := p_htg_val / p_rate;
         END IF;
 
-        -- Vérifier aussi la correspondance directe par nom de campagne assignée
+        -- Vérifier la correspondance directe par nom ou type de campagne assignée
         SELECT EXISTS (
             SELECT 1
             FROM public.student_ad_hoc_fees saf
             JOIN public.ad_hoc_campaigns ac ON saf.campaign_id = ac.id
             WHERE saf.student_id = p_student_id
-              AND saf.school_id = v_school_id
-              AND (v_academic_year_id IS NULL OR ac.academic_year_id = v_academic_year_id)
+              AND (saf.school_id = v_school_id OR saf.school_id IS NULL)
+              AND (ac.school_id = v_school_id OR ac.school_id IS NULL)
+              AND (v_academic_year_id IS NULL OR ac.academic_year_id IS NULL OR ac.academic_year_id = v_academic_year_id)
               AND (
                 COALESCE(r_pay.nature, '') ILIKE '%' || ac.name || '%'
                 OR COALESCE(r_pay.description, '') ILIKE '%' || ac.name || '%'
-                OR (ac.name ILIKE '%assurance%' AND COALESCE(r_pay.nature, '') ILIKE '%assurance%')
+                OR COALESCE(r_pay.notes, '') ILIKE '%' || ac.name || '%'
+                OR (ac.name ILIKE '%assurance%' AND (
+                    COALESCE(r_pay.nature, '') ILIKE '%assurance%'
+                    OR COALESCE(r_pay.description, '') ILIKE '%assurance%'
+                    OR COALESCE(r_pay.notes, '') ILIKE '%assurance%'
+                ))
               )
         ) INTO v_is_camp_match;
 
@@ -280,23 +399,29 @@ BEGIN
            OR UPPER(COALESCE(r_pay.fee_type, '')) IN ('AD_HOC', 'CAMPAGNE', 'CAMPAIGN')
            OR COALESCE(r_pay.nature, '') ILIKE '%campagne%'
            OR COALESCE(r_pay.nature, '') ILIKE '%adhoc%'
+           OR COALESCE(r_pay.nature, '') ILIKE '%ad-hoc%'
            OR COALESCE(r_pay.type, '') ILIKE '%campagne%'
            OR COALESCE(r_pay.description, '') ILIKE '%campagne%'
+           OR COALESCE(r_pay.notes, '') ILIKE '%campagne%'
            OR v_is_camp_match THEN
             v_adhoc_paid_htg := v_adhoc_paid_htg + p_htg_val;
 
-        -- B. Frais d'admission / réinscription
-        ELSIF UPPER(COALESCE(r_pay.fee_type, '')) IN ('INSCRIPTION', 'REINSCRIPTION', 'ADMISSION')
+        -- B. Frais d'admission / inscription / réinscription
+        ELSIF UPPER(COALESCE(r_pay.fee_type, '')) IN ('INSCRIPTION', 'REINSCRIPTION', 'RÉINSCRIPTION', 'ADMISSION', 'INSCRIPTION_REINSCRIPTION')
            OR COALESCE(r_pay.nature, '') ILIKE '%inscri%'
-           OR COALESCE(r_pay.nature, '') ILIKE '%admission%'
+           OR COALESCE(r_pay.nature, '') ILIKE '%admiss%'
            OR COALESCE(r_pay.nature, '') ILIKE '%entree%'
-           OR COALESCE(r_pay.nature, '') ILIKE '%entrée%' THEN
+           OR COALESCE(r_pay.nature, '') ILIKE '%entrée%'
+           OR COALESCE(r_pay.type, '') ILIKE '%inscri%'
+           OR COALESCE(r_pay.description, '') ILIKE '%inscri%' THEN
             v_adm_paid_usd := v_adm_paid_usd + p_usd_val;
             v_adm_paid_htg := v_adm_paid_htg + p_htg_val;
 
         -- C. Frais Divers Obligatoires
         ELSIF UPPER(COALESCE(r_pay.fee_type, '')) IN ('DIVERS', 'MISC')
-           OR COALESCE(r_pay.nature, '') ILIKE '%divers%' THEN
+           OR COALESCE(r_pay.nature, '') ILIKE '%divers%'
+           OR COALESCE(r_pay.type, '') ILIKE '%divers%'
+           OR COALESCE(r_pay.description, '') ILIKE '%divers%' THEN
             v_misc_paid_usd := v_misc_paid_usd + p_usd_val;
             v_misc_paid_htg := v_misc_paid_htg + p_htg_val;
 
@@ -409,6 +534,7 @@ DECLARE
     v_total_debt NUMERIC := 0;
     v_school_id UUID := p_school_id;
     v_excluded_label TEXT := NULL;
+    v_excluded_start_year INTEGER := 0;
 BEGIN
     IF v_school_id IS NULL THEN
         SELECT school_id INTO v_school_id FROM public.students WHERE id = p_student_id;
@@ -416,6 +542,9 @@ BEGIN
 
     IF p_exclude_year_id IS NOT NULL THEN
         SELECT label INTO v_excluded_label FROM public.academic_years WHERE id = p_exclude_year_id;
+        IF v_excluded_label IS NOT NULL THEN
+            v_excluded_start_year := COALESCE((regexp_match(v_excluded_label, '(\d{4})'))[1]::integer, 0);
+        END IF;
     END IF;
 
     FOR v_year_record IN
@@ -424,9 +553,15 @@ BEGIN
         JOIN public.academic_years ay ON e.academic_year_id = ay.id
         WHERE e.student_id = p_student_id
           AND (v_school_id IS NULL OR e.school_id = v_school_id)
+          AND COALESCE(UPPER(e.status), '') NOT IN ('ANNULE', 'ANNULÉ', 'CANCELLED')
           AND (p_exclude_year_id IS NULL OR e.academic_year_id IS DISTINCT FROM p_exclude_year_id)
-          AND ay.status IN ('PAST', 'ACTIVE')
-          AND (v_excluded_label IS NULL OR ay.label < v_excluded_label)
+          AND (ay.status IN ('PAST', 'ACTIVE') OR ay.is_active = true)
+          AND COALESCE(UPPER(ay.status), '') NOT IN ('FUTURE', 'PLANIFIEE', 'PLANIFIÉE', 'PREPARATION', 'PRÉPARATION')
+          AND (
+              v_excluded_start_year = 0
+              OR COALESCE((regexp_match(ay.label, '(\d{4})'))[1]::integer, 0) = 0
+              OR COALESCE((regexp_match(ay.label, '(\d{4})'))[1]::integer, 0) < v_excluded_start_year
+          )
     LOOP
         v_balance_json := public.get_student_real_balance(p_student_id, v_year_record.academic_year_id, v_school_id);
         v_total_debt := v_total_debt + COALESCE((v_balance_json->>'total_debt_htg')::numeric, 0);

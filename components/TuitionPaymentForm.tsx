@@ -917,21 +917,30 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
         if (p.academic_year_id === targetYearId) return true;
         if (!p.academic_year_id && !hasPrior) return true;
         return false;
-      }).filter(isPaymentCompleted);
+      }).filter((p: any) => {
+        const ft = String(p.fee_type || '').toUpperCase();
+        return isPaymentCompleted(p) && !isWalletDeposit(p) && ft !== 'FOURNITURE' && ft !== 'SUPPLIES';
+      });
 
-      const isCampPay = (p: any) => Boolean(
-        p.ad_hoc_campaign_id || 
-        p.campaign_id || 
-        p.campaign?.id ||
-        (p.fee_type || '').toUpperCase() === 'AD_HOC' ||
-        (p.fee_type || '').toUpperCase() === 'CAMPAGNE' ||
-        (p.fee_type || '').toUpperCase() === 'CAMPAIGN' ||
-        (p.rubrique || '').toLowerCase().includes('campagne') ||
-        (p.nature || '').toLowerCase().includes('campagne') ||
-        (p.nature || '').toLowerCase().includes('parascolaire') ||
-        (p.type || '').toLowerCase().includes('campagne') ||
-        (p.description || '').toLowerCase().includes('campagne')
-      );
+      const isCampPay = (p: any, campaignsList: any[] = currentCampaigns || []) => {
+        const ft = String(p.fee_type || '').toUpperCase();
+        if (p.ad_hoc_campaign_id || p.campaign_id || p.campaign?.id) return true;
+        if (ft === 'AD_HOC' || ft === 'CAMPAGNE' || ft === 'CAMPAIGN') return true;
+        const text = `${p.rubrique || ''} ${p.nature || ''} ${p.label || ''} ${p.type || ''} ${p.description || ''} ${p.notes || ''}`.toLowerCase();
+        if (text.includes('campagne') || text.includes('parascolaire') || text.includes('adhoc') || text.includes('ad-hoc')) return true;
+        return (campaignsList || []).some((c: any) => {
+          const camp = c.campaign ? (Array.isArray(c.campaign) ? c.campaign[0] : c.campaign) : c;
+          const cName = String(camp?.name || c.name || '').trim().toLowerCase();
+          const cType = String(camp?.type || '').trim().toLowerCase();
+          return Boolean(
+            cName && (
+              text.includes(cName) ||
+              (cName.includes('assurance') && text.includes('assurance')) ||
+              (cType && cType !== 'autre' && text.includes(cType))
+            )
+          );
+        });
+      };
 
       const curCampaignPayments = curPayments.filter(p => isCampPay(p));
       const curAdmPayments = curPayments.filter(p => !isCampPay(p) && isAdmissionPayment(p));
@@ -1061,16 +1070,24 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
         const pastPayments = (allPayments || []).filter((p: any) => {
           if (p.academic_year_id === enr.academic_year_id) return true;
           return false;
-        }).filter(isPaymentCompleted);
+        }).filter((p: any) => {
+          const ft = String(p.fee_type || '').toUpperCase();
+          return isPaymentCompleted(p) && !isWalletDeposit(p) && ft !== 'FOURNITURE' && ft !== 'SUPPLIES';
+        });
 
-        // Frais ad-hoc passés filtrés en mémoire
+        // Frais ad-hoc passés filtrés et dédoublonnés en mémoire
         let pastAdHocDue = 0;
         let pastAdHocPaid = 0;
+        let relevantPastAdHocs: any[] = [];
         if (pastAdHocFees && pastAdHocFees.length > 0) {
-          const relevantPastAdHocs = (pastAdHocFees as any[]).filter((f: any) => {
+          const dedupPastMap = new Map<string, any>();
+          (pastAdHocFees as any[]).forEach((f: any) => {
             const camp = Array.isArray(f.campaign) ? f.campaign[0] : f.campaign;
-            return camp?.academic_year_id === enr.academic_year_id;
+            if (camp?.academic_year_id !== enr.academic_year_id) return;
+            const cid = String(f.campaign_id || camp?.id || f.id);
+            if (!dedupPastMap.has(cid)) dedupPastMap.set(cid, f);
           });
+          relevantPastAdHocs = Array.from(dedupPastMap.values());
           for (const f of relevantPastAdHocs) {
             const camp = Array.isArray(f.campaign) ? f.campaign[0] : f.campaign;
             const cAmt = (f.custom_amount !== null && f.custom_amount !== undefined) ? Number(f.custom_amount) : Number(camp?.amount || 0);
@@ -1100,21 +1117,27 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
           return s.includes('divers') || s.includes('misc');
         };
 
-        const pastCampaignPayments = pastPayments.filter(p => isCampPay(p));
-        const pastAdmPayments = pastPayments.filter(p => !isCampPay(p) && isAdmissionPayment(p));
-        const pastMiscPayments = pastPayments.filter(p => !isCampPay(p) && !isAdmissionPayment(p) && isMiscPayment(p));
-        const pastTuitionPayments = pastPayments.filter(p => !isCampPay(p) && !isAdmissionPayment(p) && !isMiscPayment(p));
+        const pastCampaignPayments = pastPayments.filter(p => isCampPay(p, relevantPastAdHocs));
+        const pastAdmPayments = pastPayments.filter(p => !isCampPay(p, relevantPastAdHocs) && isAdmissionPayment(p));
+        const pastMiscPayments = pastPayments.filter(p => !isCampPay(p, relevantPastAdHocs) && !isAdmissionPayment(p) && isMiscPayment(p));
+        const pastTuitionPayments = pastPayments.filter(p => !isCampPay(p, relevantPastAdHocs) && !isAdmissionPayment(p) && !isMiscPayment(p));
 
         const pastAdmBal = computeFeeCategoryBalance(pastAdmHTG, pastAdmUSD, pastAdmPayments, currentExchangeRate);
         const pastMiscBal = computeFeeCategoryBalance(pastMiscHTG, pastMiscUSD, pastMiscPayments, currentExchangeRate);
         const pastTuitionBal = computeFeeCategoryBalance(pastTuitionHTG, pastTuitionUSD, pastTuitionPayments, currentExchangeRate, pastTotalDiscount);
-        pastAdHocPaid = pastCampaignPayments.reduce((acc, p) => acc + Number(p.amount_htg_equivalent || p.amount || 0), 0);
+        pastAdHocPaid = pastCampaignPayments.reduce((acc, p) => {
+          const htgEq = Number(p.amount_htg_equivalent || 0);
+          if (htgEq > 0) return acc + htgEq;
+          const raw = Number(p.amount || 0);
+          return acc + (p.currency === 'USD' && raw <= 2000 ? raw * (Number(p.exchange_rate_applied) || currentExchangeRate || 135) : raw);
+        }, 0);
 
         const sessionTotalDue = pastAdmBal.effectiveDueHTG + pastMiscBal.effectiveDueHTG + pastTuitionBal.effectiveDueHTG + pastAdHocDue;
         const sessionTotalPaid = pastAdmBal.paidHTGEquiv + pastMiscBal.paidHTGEquiv + pastTuitionBal.paidHTGEquiv + pastAdHocPaid;
-        const sessionRemaining = pastAdmBal.remainingHTGEquiv + pastMiscBal.remainingHTGEquiv + pastTuitionBal.remainingHTGEquiv + Math.max(0, pastAdHocDue - pastAdHocPaid);
-        const isSolvent = sessionRemaining <= 50;
-        const trueRemaining = isSolvent ? 0 : Math.round(sessionRemaining);
+        const rawCatRemaining = pastAdmBal.remainingHTGEquiv + pastMiscBal.remainingHTGEquiv + pastTuitionBal.remainingHTGEquiv + Math.max(0, pastAdHocDue - pastAdHocPaid);
+        const netSessionDiff = sessionTotalDue - sessionTotalPaid;
+        const isSolvent = rawCatRemaining <= 50 || netSessionDiff <= 50;
+        const trueRemaining = isSolvent ? 0 : Math.min(Math.round(rawCatRemaining), Math.max(0, Math.round(netSessionDiff)));
 
         // Seules les sessions ANTÉRIEURES (passées) génèrent des arriérés historiques !
         // Une session FUTURE (en préparation) n'est jamais une dette échue / arriérée.

@@ -1013,17 +1013,20 @@ const AccountStatementView: React.FC<{ user: UserProfile }> = ({ user }) => {
       const exchangeRate = rateRes?.[0]?.rate_usd_to_htg || 132.50;
       const campaignData = campaignResData || [];
 
-      const activeCampaigns = campaignData
-        .map((fee: any) => {
-          if (!fee.campaign) return null;
-          return {
+      const activeCampaignMap = new Map<string, any>();
+      campaignData.forEach((fee: any) => {
+        if (!fee.campaign || fee.campaign.academic_year_id !== activeYearId) return;
+        const cid = String(fee.campaign.id || fee.campaign_id || fee.id);
+        if (!activeCampaignMap.has(cid)) {
+          activeCampaignMap.set(cid, {
             ...fee.campaign,
             custom_amount: fee.custom_amount,
             adjustment_reason: fee.adjustment_reason,
             fee_id: fee.id
-          };
-        })
-        .filter((c: any) => c !== null && c.academic_year_id === activeYearId);
+          });
+        }
+      });
+      const activeCampaigns = Array.from(activeCampaignMap.values());
 
       let campaignsExpected = activeCampaigns.reduce((sum, camp) => {
         const required = camp.custom_amount !== null && camp.custom_amount !== undefined ? Number(camp.custom_amount) : Number(camp.amount);
@@ -1064,8 +1067,25 @@ const AccountStatementView: React.FC<{ user: UserProfile }> = ({ user }) => {
       const studentDiscount = Number(student.discount_amount || 0);
       const totalDiscount = tuitionDiscount + studentDiscount;
 
-      // Categorize payments accurately by nature/type
-      const isCampaignPayment = (p: any) => !!p.ad_hoc_campaign_id;
+      // Categorize payments accurately by nature/type/campaign
+      const isCampaignPayment = (p: any) => {
+        const ft = String(p.fee_type || '').toUpperCase();
+        if (p.ad_hoc_campaign_id || p.campaign_id) return true;
+        if (ft === 'AD_HOC' || ft === 'CAMPAGNE' || ft === 'CAMPAIGN') return true;
+        const text = `${p.nature || ''} ${p.label || ''} ${p.type || ''} ${p.description || ''} ${p.notes || ''}`.toLowerCase();
+        if (text.includes('campagne') || text.includes('adhoc') || text.includes('ad-hoc')) return true;
+        return activeCampaigns.some((camp: any) => {
+          const cName = String(camp.name || '').trim().toLowerCase();
+          const cType = String(camp.type || '').trim().toLowerCase();
+          return Boolean(
+            cName && (
+              text.includes(cName) ||
+              (cName.includes('assurance') && text.includes('assurance')) ||
+              (cType && cType !== 'autre' && text.includes(cType))
+            )
+          );
+        });
+      };
       const isAdmissionPayment = (p: any) => {
         const feeType = (p.fee_type || '').toLowerCase();
         const nature = (p.nature || '').toLowerCase();
@@ -1101,17 +1121,23 @@ const AccountStatementView: React.FC<{ user: UserProfile }> = ({ user }) => {
         const desc = (p.description || '').toLowerCase();
         return (
           feeType.includes('divers') ||
+          feeType.includes('misc') ||
           nature.includes('divers') ||
           type.includes('divers') ||
           desc.includes('divers')
         );
       };
 
-      const validPayments = payments?.filter(p => 
-        isPaymentCompleted(p) && 
-        !isWalletDeposit(p) &&
-        isPaymentInDateRange(p, startDate, endDate)
-      ) || [];
+      const validPayments = payments?.filter(p => {
+        const ft = String(p.fee_type || '').toUpperCase();
+        return (
+          isPaymentCompleted(p) &&
+          !isWalletDeposit(p) &&
+          ft !== 'FOURNITURE' &&
+          ft !== 'SUPPLIES' &&
+          isPaymentInDateRange(p, startDate, endDate)
+        );
+      }) || [];
 
       const admissionPayments = validPayments.filter(p => !isCampaignPayment(p) && isAdmissionPayment(p));
       const campaignPayments = validPayments.filter(p => isCampaignPayment(p));
@@ -1155,10 +1181,12 @@ const AccountStatementView: React.FC<{ user: UserProfile }> = ({ user }) => {
         const cCurr = String(camp.currency || 'HTG').toUpperCase();
         const pHTG = cCurr === 'USD' ? 0 : cAmt;
         const pUSD = cCurr === 'USD' ? cAmt : 0;
-        const cPayments = campaignPayments.filter((p: any) => 
-          (camp.id && (p.ad_hoc_campaign_id === camp.id || p.campaign_id === camp.id)) ||
-          ((p.nature || p.label || p.description || '').toLowerCase().includes((camp.name || '').toLowerCase()))
-        );
+        const cName = String(camp.name || '').trim().toLowerCase();
+        const cPayments = campaignPayments.filter((p: any) => {
+          if (camp.id && (p.ad_hoc_campaign_id === camp.id || p.campaign_id === camp.id)) return true;
+          const text = `${p.nature || ''} ${p.label || ''} ${p.type || ''} ${p.description || ''} ${p.notes || ''}`.toLowerCase();
+          return Boolean(cName && (text.includes(cName) || (cName.includes('assurance') && text.includes('assurance'))));
+        });
         const cBreakdown = computeFeeCategoryBalance(pHTG, pUSD, cPayments, exchangeRate);
         campaignsExpected += cBreakdown.effectiveDueHTG;
         campaignsPaid += cBreakdown.paidHTGEquiv;
@@ -1167,8 +1195,12 @@ const AccountStatementView: React.FC<{ user: UserProfile }> = ({ user }) => {
 
       const originalDue = admissionExpected + tuitionFee + planMiscFee + tuitionAddition + campaignsExpected;
       const paid = admissionPaid + tuitionPaid + miscPaid + campaignsPaid;
-      const balance = admissionBreakdown.remainingHTGEquiv + tuitionBreakdown.remainingHTGEquiv + miscBreakdown.remainingHTGEquiv + campaignsRemaining;
+      const rawCatBalance = admissionBreakdown.remainingHTGEquiv + tuitionBreakdown.remainingHTGEquiv + miscBreakdown.remainingHTGEquiv + campaignsRemaining;
       const totalDue = Math.max(paid, originalDue - totalDiscount);
+      const netDiff = totalDue - paid;
+      const balance = (netDiff <= 50 || rawCatBalance <= 50)
+        ? 0
+        : Math.min(Math.round(rawCatBalance), Math.max(0, Math.round(netDiff)));
 
       if (enrollment?.class_id) {
         setGenClass(enrollment.class_id);

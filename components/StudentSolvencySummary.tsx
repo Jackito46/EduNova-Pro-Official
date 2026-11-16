@@ -190,7 +190,10 @@ export const StudentSolvencySummary: React.FC<StudentSolvencySummaryProps> = ({
         if (preloadedCampaigns === undefined && adHocRes?.data) adHocFeesList = adHocRes.data || [];
       }
 
-      const isReenrolled = previousEnrollments.length > 1;
+      const uniqueEnrollmentYearIds = new Set(
+        (previousEnrollments || []).map((e: any) => e.academic_year_id).filter(Boolean)
+      );
+      const isReenrolled = uniqueEnrollmentYearIds.size > 1;
       const effectiveClassId = enrollmentRecord?.class_id || classId || studentRecord?.class_id;
 
       // 4. Charger le plan tarifaire (fee_plans)

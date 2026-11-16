@@ -66,7 +66,7 @@ const isCampaignPayment = (p: any, campaignsForYear: any[]): boolean => {
   if (p.ad_hoc_campaign_id || p.campaign_id || campRel?.id) return true;
   if (ft === 'AD_HOC' || ft === 'CAMPAGNE' || ft === 'CAMPAIGN') return true;
 
-  const text = `${p.nature || ''} ${p.label || ''} ${p.type || ''} ${p.description || ''}`.toLowerCase();
+  const text = `${p.nature || ''} ${p.label || ''} ${p.type || ''} ${p.description || ''} ${p.notes || ''}`.toLowerCase();
   if (text.includes('campagne') || text.includes('adhoc') || text.includes('ad-hoc')) return true;
 
   return (campaignsForYear || []).some((fee: any) => {
@@ -98,6 +98,8 @@ const getPaymentHTG = (p: any, fallbackRate: number): number => {
 /**
  * Audit comptable multi-devises, multi-catégories et multi-tenant des arriérés d'un élève.
  * Élimine les arriérés fantômes causés par :
+ * - des colonnes optionnelles absentes sur certains schémas (ex: students.is_foreign)
+ * - des doublons d'inscriptions ou d'assignations de campagnes sur une même session
  * - des campagnes ad-hoc mal classées en SQL (ex: ASSURANCE SCOLAIRE)
  * - des remises ad-hoc (`custom_amount`) ou bourses non prises en compte
  * - des variations de taux USD/HTG sur frais déjà acquittés
@@ -128,10 +130,10 @@ export async function computeCertifiedStudentArrears({
 
     let effectiveSchoolId = schoolId || null;
 
-    // 1. Charger l'élève en isolation stricte multi-tenant si schoolId fourni
+    // 1. Charger l'élève via select('*') pour compatibilité universelle multi-écoles (évite crash si is_foreign absent)
     let studentQuery = supabase
       .from('students')
-      .select('id, school_id, class_id, discount_amount, is_foreign')
+      .select('*')
       .eq('id', studentId);
 
     if (effectiveSchoolId) {
@@ -213,13 +215,34 @@ export async function computeCertifiedStudentArrears({
     const parsedRate = Number(rateRow?.rate_usd_to_htg ?? rateRow?.rate ?? safeFallbackRate);
     const currentExchangeRate = Number.isFinite(parsedRate) && parsedRate > 1 ? parsedRate : safeFallbackRate;
 
-    const allEnrollments = (rawEnrollments || [])
+    const allEnrollmentsRaw = (rawEnrollments || [])
       .filter((e: any) => !e.school_id || !effectiveSchoolId || e.school_id === effectiveSchoolId)
+      .filter((e: any) => {
+        const st = String(e.status || '').toUpperCase();
+        return st !== 'ANNULE' && st !== 'ANNULÉ' && st !== 'CANCELLED';
+      })
       .map((e: any) => {
         const ay = Array.isArray(e.academic_year) ? e.academic_year[0] : (e.academic_year || yearsMap.get(e.academic_year_id));
         const cls = Array.isArray(e.class) ? e.class[0] : e.class;
         return { ...e, academic_year: ay, class: cls };
       });
+
+    // Dédoublonner par academic_year_id (conserver la ligne la plus récente/active si doublon en base)
+    const enrollmentByYearMap = new Map<string, any>();
+    for (const enr of allEnrollmentsRaw) {
+      if (!enr.academic_year_id) continue;
+      const existing = enrollmentByYearMap.get(enr.academic_year_id);
+      if (!existing) {
+        enrollmentByYearMap.set(enr.academic_year_id, enr);
+      } else {
+        const prevTime = new Date(existing.created_at || 0).getTime();
+        const currTime = new Date(enr.created_at || 0).getTime();
+        if (currTime >= prevTime) {
+          enrollmentByYearMap.set(enr.academic_year_id, enr);
+        }
+      }
+    }
+    const allEnrollments = Array.from(enrollmentByYearMap.values());
 
     // Trier toutes les inscriptions chronologiquement (du plus ancien au plus récent)
     const sortedEnrollments = [...allEnrollments].sort((a, b) => {
@@ -278,14 +301,25 @@ export async function computeCertifiedStudentArrears({
       return true;
     });
 
-    const allAdHocFees = (rawAdHoc || [])
-      .filter((f: any) => !f.school_id || !effectiveSchoolId || f.school_id === effectiveSchoolId)
-      .map((f: any) => ({
-        ...f,
-        campaign: Array.isArray(f.campaign) ? f.campaign[0] : f.campaign
-      }));
+    // Dédoublonner les assignations de campagnes ad-hoc par campaign_id pour éviter toute double facturation
+    const adHocByCampaignMap = new Map<string, any>();
+    for (const f of (rawAdHoc || [])) {
+      if (f.school_id && effectiveSchoolId && f.school_id !== effectiveSchoolId) continue;
+      const camp = Array.isArray(f.campaign) ? f.campaign[0] : f.campaign;
+      const dedupKey = String(f.campaign_id || camp?.id || f.id);
+      if (!adHocByCampaignMap.has(dedupKey)) {
+        adHocByCampaignMap.set(dedupKey, { ...f, campaign: camp });
+      }
+    }
+    const allAdHocFees = Array.from(adHocByCampaignMap.values());
 
-    const unallocatedPayments = validFeePayments.filter(p => !p.academic_year_id);
+    // Rattacher à la dernière session auditable les paiements sans année OU dont l'année n'appartient à aucune inscription existante (et n'est pas l'année exclue)
+    const enrolledYearIds = new Set(allEnrollments.map(e => e.academic_year_id));
+    const unallocatedPayments = validFeePayments.filter((p) => {
+      if (!p.academic_year_id) return true;
+      if (excludeYearId && p.academic_year_id === excludeYearId) return false;
+      return !enrolledYearIds.has(p.academic_year_id);
+    });
 
     let totalArrears = 0;
     const sessions: SessionArrearsDetail[] = [];
@@ -313,10 +347,11 @@ export async function computeCertifiedStudentArrears({
         ? [...yearSpecificPayments, ...unallocatedPayments]
         : yearSpecificPayments;
 
-      // Campagnes de cette année
+      // Campagnes de cette année (les campagnes sans academic_year_id ne sont comptées que sur la session auditable la plus récente)
       const yearCampaigns = allAdHocFees.filter((f: any) => {
         if (!f.campaign) return false;
-        return !f.campaign.academic_year_id || f.campaign.academic_year_id === yrId;
+        if (!f.campaign.academic_year_id) return isLatestAuditableSession;
+        return f.campaign.academic_year_id === yrId;
       });
 
       const campaignPayments = yearPayments.filter(p => isCampaignPayment(p, yearCampaigns));
@@ -363,7 +398,7 @@ export async function computeCertifiedStudentArrears({
         const matchedCampPayments = campaignPayments.filter((p: any) => {
           const pCamp = Array.isArray(p.campaign) ? p.campaign[0] : p.campaign;
           if (fId && (p.ad_hoc_campaign_id === fId || p.campaign_id === fId || pCamp?.id === fId)) return true;
-          const text = `${p.nature || ''} ${p.label || ''} ${p.type || ''} ${p.description || ''}`.toLowerCase();
+          const text = `${p.nature || ''} ${p.label || ''} ${p.type || ''} ${p.description || ''} ${p.notes || ''}`.toLowerCase();
           return Boolean(fName && text && (text.includes(fName) || (fName.includes('assurance') && text.includes('assurance'))));
         });
 
