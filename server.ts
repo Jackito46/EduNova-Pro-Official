@@ -1,5 +1,6 @@
 
 import fs from 'fs';
+import os from 'os';
 import crypto from 'crypto';
 import express from 'express';
 import { createServer as createViteServer } from 'vite';
@@ -47,7 +48,30 @@ process.on('uncaughtException', (err: any) => {
   }
 });
 
-const supabaseUrl = process.env.VITE_SUPABASE_URL || 'https://iymzthjkucvhyjnxpslg.supabase.co';
+const internalSupabaseUrl = (process.env.INTERNAL_SUPABASE_URL || '').trim().replace(/\/$/, '');
+const lanProxyEnabled = process.env.SUPABASE_LAN_PROXY === 'true' && Boolean(internalSupabaseUrl);
+const rawDeploymentMode = (process.env.EDUNOVA_DEPLOYMENT_MODE || '').trim().toLowerCase();
+const deploymentMode: 'lan' | 'standalone' | 'cloud' =
+  rawDeploymentMode === 'lan' || rawDeploymentMode === 'standalone'
+    ? rawDeploymentMode
+    : lanProxyEnabled
+      ? 'lan'
+      : 'cloud';
+const lanServerLabel = (process.env.LAN_SERVER_LABEL || '').trim() || (
+  deploymentMode === 'standalone'
+    ? 'Poste Autonome EduNova Pro'
+    : deploymentMode === 'lan'
+      ? 'Serveur Local Établissement'
+      : 'EduNova Cloud'
+);
+
+const publicRuntimeSupabaseUrl = (
+  process.env.SUPABASE_PUBLIC_URL ||
+  process.env.VITE_SUPABASE_URL ||
+  'https://iymzthjkucvhyjnxpslg.supabase.co'
+).trim().replace(/\/$/, '');
+
+const supabaseUrl = internalSupabaseUrl || publicRuntimeSupabaseUrl;
 const supabaseServiceKey = (
   process.env.SUPABASE_SERVICE_ROLE_KEY ||
   process.env.SUPABASE_SERVICE_ROLE ||
@@ -55,7 +79,11 @@ const supabaseServiceKey = (
   process.env.SUPABASE_SERVICE_KEY ||
   ''
 ).trim();
-const supabaseAnonKey = process.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml5bXp0aGprdWN2aHlqbnhwc2xnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzA5NjU3NDQsImV4cCI6MjA4NjU0MTc0NH0.85nnxqaNsfSfzuz-twBh_S5WlqE18UWa3Q-c6RlSoaE';
+const supabaseAnonKey = (
+  process.env.SUPABASE_ANON_KEY ||
+  process.env.VITE_SUPABASE_ANON_KEY ||
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml5bXp0aGprdWN2aHlqbnhwc2xnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzA5NjU3NDQsImV4cCI6MjA4NjU0MTc0NH0.85nnxqaNsfSfzuz-twBh_S5WlqE18UWa3Q-c6RlSoaE'
+).trim();
 
 // Configure web-push
 const vapidPublicKey = (process.env.VAPID_PUBLIC_KEY || '').trim();
@@ -117,6 +145,10 @@ async function startServer() {
   const allowedOriginPatterns = [
     /^https?:\/\/localhost(:\d+)?$/,
     /^https?:\/\/127\.0\.0\.1(:\d+)?$/,
+    /^https?:\/\/192\.168\.\d{1,3}\.\d{1,3}(:\d+)?$/,
+    /^https?:\/\/10\.\d{1,3}\.\d{1,3}\.\d{1,3}(:\d+)?$/,
+    /^https?:\/\/172\.(1[6-9]|2\d|3[0-1])\.\d{1,3}\.\d{1,3}(:\d+)?$/,
+    /^https?:\/\/[\w-]+\.local(:\d+)?$/,
     /^https:\/\/.*\.run\.app$/,
     /^https:\/\/.*\.google\.com$/,
     /^https:\/\/.*\.aistudio\.google\.com$/,
@@ -154,8 +186,9 @@ async function startServer() {
     res.setHeader('Access-Control-Allow-Methods', 'GET, HEAD, POST, PUT, DELETE, PATCH, OPTIONS');
     res.setHeader(
       'Access-Control-Allow-Headers',
-      'Origin, X-Requested-With, Content-Type, Accept, Authorization, Cache-Control, Pragma, X-Demo-Signature, X-Demo-Timestamp, X-Demo-Nonce, X-Signature, X-Timestamp, X-Nonce'
+      'Origin, X-Requested-With, Content-Type, Accept, Authorization, apikey, x-client-info, prefer, range, content-profile, accept-profile, Cache-Control, Pragma, X-Demo-Signature, X-Demo-Timestamp, X-Demo-Nonce, X-Signature, X-Timestamp, X-Nonce'
     );
+    res.setHeader('Access-Control-Expose-Headers', 'Content-Range, Range-Unit, X-Total-Count');
     res.setHeader('Access-Control-Max-Age', '86400');
 
     // En-têtes de durcissement défensif (Anti-MIME Sniffing, Anti-XSS, Isolation)
@@ -167,6 +200,112 @@ async function startServer() {
       return res.status(204).end();
     }
     next();
+  });
+
+  // =========================================================================
+  // CONFIGURATION RUNTIME CLIENT & PROXY INVERSE SUPABASE LAN (/local-supabase)
+  // Permet aux postes clients du réseau local d'accéder à l'app + base sur 1 seul port (3000)
+  // =========================================================================
+  function getDetectedLanUrls(listenPort: number): string[] {
+    const urls: string[] = [];
+    try {
+      const nets = os.networkInterfaces();
+      for (const entries of Object.values(nets)) {
+        if (!entries) continue;
+        for (const iface of entries) {
+          if (iface.family === 'IPv4' && !iface.internal) {
+            urls.push(`http://${iface.address}:${listenPort}`);
+          }
+        }
+      }
+    } catch {}
+    return Array.from(new Set(urls));
+  }
+
+  app.get('/runtime-config.js', (_req, res) => {
+    const runtimePayload = {
+      deploymentMode,
+      lanProxyEnabled,
+      lanServerLabel,
+      supabaseUrl: lanProxyEnabled ? '/local-supabase' : publicRuntimeSupabaseUrl,
+      supabaseAnonKey,
+    };
+    const serialized = JSON.stringify(runtimePayload).replace(/</g, '\\u003c');
+    res.setHeader('Content-Type', 'application/javascript; charset=utf-8');
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
+    res.send(`window.__EDUNOVA_RUNTIME__ = ${serialized};`);
+  });
+
+  app.use('/local-supabase', express.raw({ type: '*/*', limit: '50mb' }), async (req, res) => {
+    if (!lanProxyEnabled || !internalSupabaseUrl) {
+      return res.status(503).json({
+        message: 'Le proxy local Supabase (SUPABASE_LAN_PROXY) n’est pas activé sur cette instance.',
+        code: 'LAN_PROXY_DISABLED',
+      });
+    }
+
+    const forwardPath = req.url.startsWith('/') ? req.url : `/${req.url}`;
+    const targetUrl = `${internalSupabaseUrl}${forwardPath}`;
+    const hopByHop = new Set([
+      'host',
+      'connection',
+      'keep-alive',
+      'proxy-authenticate',
+      'proxy-authorization',
+      'te',
+      'trailers',
+      'transfer-encoding',
+      'upgrade',
+      'content-length',
+      'accept-encoding',
+    ]);
+
+    const forwardHeaders = new Headers();
+    for (const [k, v] of Object.entries(req.headers)) {
+      if (!v || hopByHop.has(k.toLowerCase())) continue;
+      if (Array.isArray(v)) {
+        forwardHeaders.set(k, v.join(', '));
+      } else {
+        forwardHeaders.set(k, v);
+      }
+    }
+
+    const hasBody = req.method !== 'GET' && req.method !== 'HEAD';
+    const rawBody = hasBody && Buffer.isBuffer(req.body) && req.body.length > 0 ? new Uint8Array(req.body) : undefined;
+
+    try {
+      const upstream = await fetch(targetUrl, {
+        method: req.method,
+        headers: forwardHeaders,
+        body: rawBody,
+        redirect: 'manual',
+        signal: AbortSignal.timeout(20000),
+      });
+
+      res.status(upstream.status);
+      upstream.headers.forEach((value, key) => {
+        const lower = key.toLowerCase();
+        if (
+          lower === 'content-encoding' ||
+          lower === 'transfer-encoding' ||
+          lower === 'connection' ||
+          lower === 'content-length' ||
+          lower.startsWith('access-control-')
+        ) {
+          return;
+        }
+        res.setHeader(key, value);
+      });
+
+      const responseBuffer = Buffer.from(await upstream.arrayBuffer());
+      return res.send(responseBuffer);
+    } catch (err: any) {
+      return res.status(503).json({
+        message: 'Base locale Supabase momentanément injoignable. Vérifiez les conteneurs Docker.',
+        code: 'NETWORK_ERROR',
+        details: err?.message || 'Upstream unavailable',
+      });
+    }
   });
 
   // =========================================================================
@@ -370,10 +509,44 @@ async function startServer() {
     res.json({ 
       status: 'ok', 
       app: 'EduNova Pro',
+      deploymentMode,
+      lanProxyActive: lanProxyEnabled,
       uptimeSeconds: Math.floor(process.uptime()),
       keepAliveActive: true,
       supabaseConfigured: !!supabaseUrl,
       timestamp: new Date().toISOString() 
+    });
+  });
+
+  // Statut et découverte du Serveur Local / LAN
+  app.get('/api/lan/status', async (_req, res) => {
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+    const isProd = process.env.NODE_ENV === 'production';
+    const activePort = isProd && process.env.PORT ? parseInt(process.env.PORT, 10) : PORT;
+    const detectedLanUrls = getDetectedLanUrls(activePort);
+    let localSupabaseReachable: boolean | null = null;
+
+    if (lanProxyEnabled && internalSupabaseUrl) {
+      try {
+        const probe = await fetch(`${internalSupabaseUrl}/auth/v1/health`, {
+          signal: AbortSignal.timeout(2000),
+        });
+        localSupabaseReachable = probe.ok || probe.status < 500;
+      } catch {
+        localSupabaseReachable = false;
+      }
+    }
+
+    res.json({
+      deploymentMode,
+      lanProxyActive: lanProxyEnabled,
+      lanServerLabel,
+      internalSupabaseConfigured: Boolean(internalSupabaseUrl),
+      localSupabaseReachable,
+      detectedLanUrls,
+      loopbackUrl: `http://localhost:${activePort}`,
+      isLoopbackOnly: process.env.BIND_HOST === '127.0.0.1' || deploymentMode === 'standalone',
+      timestamp: new Date().toISOString(),
     });
   });
 

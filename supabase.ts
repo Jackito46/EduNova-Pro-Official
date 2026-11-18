@@ -1,26 +1,194 @@
 
 import { createClient } from '@supabase/supabase-js';
 
-const envUrl = import.meta.env.VITE_SUPABASE_URL;
-let originalSupabaseUrl = envUrl || 'https://iymzthjkucvhyjnxpslg.supabase.co';
+export type DeploymentMode = 'cloud' | 'lan' | 'standalone';
 
-// Ensure protocol is present
-if (originalSupabaseUrl && !originalSupabaseUrl.startsWith('http')) {
-  // If it's a local IP or localhost, default to http, otherwise https
-  const isLocal = originalSupabaseUrl.includes('localhost') || 
-                  originalSupabaseUrl.includes('127.0.0.1') || 
-                  originalSupabaseUrl.match(/^192\.168\./) || 
-                  originalSupabaseUrl.match(/^10\./);
-  originalSupabaseUrl = `${isLocal ? 'http' : 'https'}://${originalSupabaseUrl}`;
+interface EduNovaRuntimeConfig {
+  deploymentMode?: DeploymentMode;
+  lanProxyEnabled?: boolean;
+  lanServerLabel?: string;
+  supabaseUrl?: string;
+  supabaseAnonKey?: string;
 }
 
-if (originalSupabaseUrl.endsWith('/')) {
-  originalSupabaseUrl = originalSupabaseUrl.slice(0, -1);
+const RUNTIME_CONFIG: EduNovaRuntimeConfig =
+  typeof window !== 'undefined' && (window as any).__EDUNOVA_RUNTIME__
+    ? (window as any).__EDUNOVA_RUNTIME__
+    : {};
+
+export const WORKSPACE_MODE_STORAGE_KEY = 'edunova_workspace_mode';
+export const LAN_OVERRIDE_URL_STORAGE_KEY = 'edunova_lan_override_url';
+export const LAN_OVERRIDE_ANON_KEY_STORAGE_KEY = 'edunova_lan_override_anon_key';
+
+const DEFAULT_CLOUD_FALLBACK_URL = 'https://iymzthjkucvhyjnxpslg.supabase.co';
+const DEFAULT_CLOUD_FALLBACK_ANON_KEY =
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml5bXp0aGprdWN2aHlqbnhwc2xnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzA5NjU3NDQsImV4cCI6MjA4NjU0MTc0NH0.85nnxqaNsfSfzuz-twBh_S5WlqE18UWa3Q-c6RlSoaE';
+
+export function normalizeSupabaseEndpointUrl(rawUrl: string): string {
+  let normalized = (rawUrl || '').trim();
+  if (!normalized) return '';
+
+  if (normalized.startsWith('/')) {
+    if (typeof window !== 'undefined' && window.location?.origin) {
+      normalized = `${window.location.origin}${normalized}`;
+    }
+  } else if (!normalized.startsWith('http://') && !normalized.startsWith('https://')) {
+    const isLocal =
+      normalized.includes('localhost') ||
+      normalized.includes('127.0.0.1') ||
+      normalized.includes('.local') ||
+      /^(192\.168\.|10\.|172\.(1[6-9]|2\d|3[0-1])\.)/.test(normalized);
+    normalized = `${isLocal ? 'http' : 'https'}://${normalized}`;
+  }
+
+  return normalized.replace(/\/+$/, '');
 }
 
-export const supabaseUrl = originalSupabaseUrl;
+function readStoredLanOverride(): { enabled: boolean; url: string; anonKey: string } {
+  if (typeof window === 'undefined') return { enabled: false, url: '', anonKey: '' };
+  try {
+    const mode = window.localStorage.getItem(WORKSPACE_MODE_STORAGE_KEY);
+    const url = window.localStorage.getItem(LAN_OVERRIDE_URL_STORAGE_KEY) || '';
+    const anonKey = window.localStorage.getItem(LAN_OVERRIDE_ANON_KEY_STORAGE_KEY) || '';
+    return {
+      enabled: mode === 'lan' && Boolean(url.trim()),
+      url: normalizeSupabaseEndpointUrl(url),
+      anonKey: anonKey.trim(),
+    };
+  } catch {
+    return { enabled: false, url: '', anonKey: '' };
+  }
+}
 
-export const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml5bXp0aGprdWN2aHlqbnhwc2xnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzA5NjU3NDQsImV4cCI6MjA4NjU0MTc0NH0.85nnxqaNsfSfzuz-twBh_S5WlqE18UWa3Q-c6RlSoaE';
+const storedLanOverride = readStoredLanOverride();
+
+const runtimeDefaultUrl = RUNTIME_CONFIG.lanProxyEnabled
+  ? normalizeSupabaseEndpointUrl(RUNTIME_CONFIG.supabaseUrl || '/local-supabase')
+  : normalizeSupabaseEndpointUrl(
+      RUNTIME_CONFIG.supabaseUrl || import.meta.env.VITE_SUPABASE_URL || DEFAULT_CLOUD_FALLBACK_URL
+    );
+
+export const supabaseUrl = storedLanOverride.enabled
+  ? storedLanOverride.url
+  : runtimeDefaultUrl || DEFAULT_CLOUD_FALLBACK_URL;
+
+export const supabaseAnonKey =
+  (storedLanOverride.enabled && storedLanOverride.anonKey) ||
+  (RUNTIME_CONFIG.supabaseAnonKey || '').trim() ||
+  import.meta.env.VITE_SUPABASE_ANON_KEY ||
+  DEFAULT_CLOUD_FALLBACK_ANON_KEY;
+
+export interface DeploymentRuntimeInfo {
+  mode: DeploymentMode;
+  lanProxyActive: boolean;
+  lanServerLabel: string;
+  activeSupabaseUrl: string;
+  defaultSupabaseUrl: string;
+  hasCustomOverride: boolean;
+  customServerUrl: string;
+  customAnonKeyConfigured: boolean;
+}
+
+export function getDeploymentRuntimeInfo(): DeploymentRuntimeInfo {
+  const override = readStoredLanOverride();
+  const baseMode: DeploymentMode = RUNTIME_CONFIG.deploymentMode || (RUNTIME_CONFIG.lanProxyEnabled ? 'lan' : 'cloud');
+  return {
+    mode: override.enabled ? 'lan' : baseMode,
+    lanProxyActive: Boolean(RUNTIME_CONFIG.lanProxyEnabled),
+    lanServerLabel: RUNTIME_CONFIG.lanServerLabel || (baseMode === 'cloud' ? 'EduNova Cloud' : 'Serveur Local Établissement'),
+    activeSupabaseUrl: supabaseUrl,
+    defaultSupabaseUrl: runtimeDefaultUrl || DEFAULT_CLOUD_FALLBACK_URL,
+    hasCustomOverride: override.enabled,
+    customServerUrl: override.url,
+    customAnonKeyConfigured: Boolean(override.anonKey),
+  };
+}
+
+export function setLocalBackendOverride(options: { enabled: boolean; url?: string; anonKey?: string }): void {
+  if (typeof window === 'undefined') return;
+  try {
+    if (!options.enabled) {
+      window.localStorage.removeItem(WORKSPACE_MODE_STORAGE_KEY);
+      window.localStorage.removeItem(LAN_OVERRIDE_URL_STORAGE_KEY);
+      window.localStorage.removeItem(LAN_OVERRIDE_ANON_KEY_STORAGE_KEY);
+      return;
+    }
+    const cleanUrl = normalizeSupabaseEndpointUrl(options.url || '');
+    if (!cleanUrl) {
+      throw new Error('Adresse du serveur local invalide.');
+    }
+    window.localStorage.setItem(WORKSPACE_MODE_STORAGE_KEY, 'lan');
+    window.localStorage.setItem(LAN_OVERRIDE_URL_STORAGE_KEY, cleanUrl);
+    if (options.anonKey && options.anonKey.trim()) {
+      window.localStorage.setItem(LAN_OVERRIDE_ANON_KEY_STORAGE_KEY, options.anonKey.trim());
+    } else {
+      window.localStorage.removeItem(LAN_OVERRIDE_ANON_KEY_STORAGE_KEY);
+    }
+  } catch (err) {
+    throw err;
+  }
+}
+
+export async function testBackendEndpointConnection(
+  rawUrl: string,
+  anonKey?: string
+): Promise<{ ok: boolean; resolvedUrl: string; latencyMs: number; error?: string }> {
+  let candidate = normalizeSupabaseEndpointUrl(rawUrl);
+  if (!candidate) {
+    return { ok: false, resolvedUrl: '', latencyMs: 0, error: 'Adresse serveur vide.' };
+  }
+
+  const startedAt = Date.now();
+  // Si l'utilisateur saisit l'URL racine du serveur EduNova LAN (ex: http://192.168.1.100:3000),
+  // détecte automatiquement /api/lan/status et résout vers /local-supabase
+  if (!candidate.endsWith('/local-supabase')) {
+    try {
+      const lanStatusRes = await fetch(`${candidate}/api/lan/status`, {
+        method: 'GET',
+        cache: 'no-store',
+        signal: AbortSignal.timeout(2500),
+      });
+      if (lanStatusRes.ok) {
+        const statusJson = await lanStatusRes.json().catch(() => null);
+        if (statusJson?.lanProxyActive) {
+          candidate = `${candidate}/local-supabase`;
+        }
+      }
+    } catch {
+      // Peut être une URL directe Kong (:8000) ou Supabase Cloud : on poursuit le test direct
+    }
+  }
+
+  try {
+    const keyToUse = (anonKey || '').trim() || supabaseAnonKey;
+    const res = await fetch(`${candidate}/rest/v1/`, {
+      method: 'GET',
+      headers: {
+        apikey: keyToUse,
+        Authorization: `Bearer ${keyToUse}`,
+      },
+      cache: 'no-store',
+      signal: AbortSignal.timeout(4000),
+    });
+    const latencyMs = Date.now() - startedAt;
+    if (res.ok || (res.status >= 400 && res.status < 500)) {
+      return { ok: true, resolvedUrl: candidate, latencyMs };
+    }
+    return {
+      ok: false,
+      resolvedUrl: candidate,
+      latencyMs,
+      error: `Réponse HTTP ${res.status} du serveur cible.`,
+    };
+  } catch (err: any) {
+    return {
+      ok: false,
+      resolvedUrl: candidate,
+      latencyMs: Date.now() - startedAt,
+      error: err?.message || 'Serveur injoignable sur le réseau local (vérifiez IP et port 3000).',
+    };
+  }
+}
 
 // Safe storage wrapper to prevent crashes in iframes when third-party cookies are blocked
 // and to provide an in-memory fallback for session stability.
@@ -190,7 +358,10 @@ export const isUiPreferenceStorageKey = (key: string): boolean => {
     'language',
     'edunova_language',
     'fontSize',                           // Taille de police / Accessibilité
-    'edunova_font_size'
+    'edunova_font_size',
+    'edunova_workspace_mode',             // Mode Serveur Local LAN / Cloud
+    'edunova_lan_override_url',           // Adresse IP/URL du serveur local d'établissement
+    'edunova_lan_override_anon_key'       // Clé anonyme locale configurée pour le poste
   ];
 
   if (preservedExactKeys.includes(key)) {

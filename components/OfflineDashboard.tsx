@@ -20,6 +20,10 @@ import {
   ShieldCheck,
   Receipt,
   BookOpen,
+  Server,
+  Copy,
+  Check,
+  RotateCcw,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { UserProfile } from '../types';
@@ -27,11 +31,17 @@ import { Link } from 'react-router-dom';
 import { useOnlineStatus } from '../hooks/useOnlineStatus';
 import { useAdaptiveLightMode } from '../hooks/useAdaptiveLightMode';
 import {
+  getDeploymentRuntimeInfo,
+  setLocalBackendOverride,
+  testBackendEndpointConnection,
+} from '../supabase';
+import {
   ensureOfflineVaultUnlocked,
   ensureStorageQuotaHealth,
   getRefCacheStatus,
   hasOfflineVaultPin,
   isOfflineVaultUnlocked,
+  isWebCryptoSecureContextAvailable,
   lockOfflineVault,
   setOfflineVaultPin,
   StorageQuotaHealth,
@@ -60,6 +70,17 @@ interface DraftItem {
   type: string;
   id: string;
   timestamp: number;
+}
+
+interface LanStatusInfo {
+  deploymentMode: 'cloud' | 'lan' | 'standalone';
+  lanProxyActive: boolean;
+  lanServerLabel: string;
+  internalSupabaseConfigured: boolean;
+  localSupabaseReachable: boolean | null;
+  detectedLanUrls: string[];
+  loopbackUrl: string;
+  isLoopbackOnly: boolean;
 }
 
 const EMPTY_SUMMARY: OfflineSyncSummary = {
@@ -106,6 +127,23 @@ export const OfflineDashboard: React.FC<OfflineDashboardProps> = ({ user }) => {
   const [isImporting, setIsImporting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
+  // Serveur Local (LAN) & Poste Autonome
+  const runtimeInfo = getDeploymentRuntimeInfo();
+  const secureContextReady = isWebCryptoSecureContextAvailable();
+  const [lanStatus, setLanStatus] = useState<LanStatusInfo | null>(null);
+  const [lanUrlInput, setLanUrlInput] = useState<string>(
+    runtimeInfo.hasCustomOverride ? runtimeInfo.customServerUrl : ''
+  );
+  const [lanAnonKeyInput, setLanAnonKeyInput] = useState<string>('');
+  const [lanTestState, setLanTestState] = useState<{
+    testing: boolean;
+    ok?: boolean;
+    resolvedUrl?: string;
+    latencyMs?: number;
+    message?: string;
+  }>({ testing: false });
+  const [copiedUrl, setCopiedUrl] = useState<string | null>(null);
+
   const formatBytes = (bytes: number, decimals = 2) => {
     if (!+bytes) return '0 Bytes';
     const k = 1024;
@@ -142,6 +180,21 @@ export const OfflineDashboard: React.FC<OfflineDashboardProps> = ({ user }) => {
     }, user.school_id);
     return unsub;
   }, [user.id, user.school_id, refreshAll]);
+
+  useEffect(() => {
+    let active = true;
+    fetch('/api/lan/status', { cache: 'no-store' })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (active && data) {
+          setLanStatus(data as LanStatusInfo);
+        }
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, []);
 
   useEffect(() => {
     const currentDrafts: DraftItem[] = [];
@@ -355,6 +408,84 @@ export const OfflineDashboard: React.FC<OfflineDashboardProps> = ({ user }) => {
       setIsImporting(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
     }
+  };
+
+  const handleCopyLanUrl = async (urlToCopy: string) => {
+    try {
+      await navigator.clipboard.writeText(urlToCopy);
+      setCopiedUrl(urlToCopy);
+      toast.success('Adresse du serveur copiée dans le presse-papiers.');
+      setTimeout(() => setCopiedUrl((curr) => (curr === urlToCopy ? null : curr)), 2000);
+    } catch {
+      toast.error('Impossible de copier automatiquement. Copiez manuellement l’adresse.');
+    }
+  };
+
+  const handleTestLanConnection = async () => {
+    if (!lanUrlInput.trim()) {
+      toast.error('Saisissez d’abord l’adresse IP ou URL du serveur local (ex: 192.168.1.100:3000).');
+      return;
+    }
+    setLanTestState({ testing: true });
+    const res = await testBackendEndpointConnection(lanUrlInput, lanAnonKeyInput);
+    if (res.ok) {
+      setLanTestState({
+        testing: false,
+        ok: true,
+        resolvedUrl: res.resolvedUrl,
+        latencyMs: res.latencyMs,
+        message: `Connexion établie (${res.latencyMs} ms) → ${res.resolvedUrl}`,
+      });
+      toast.success(`Serveur local joignable en ${res.latencyMs} ms.`);
+    } else {
+      setLanTestState({
+        testing: false,
+        ok: false,
+        resolvedUrl: res.resolvedUrl,
+        latencyMs: res.latencyMs,
+        message: res.error || 'Serveur local injoignable.',
+      });
+      toast.error(res.error || 'Serveur local injoignable.');
+    }
+  };
+
+  const handleApplyLanOverride = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!lanUrlInput.trim()) {
+      toast.error('Indiquez l’adresse du serveur local (ex: http://192.168.1.100:3000).');
+      return;
+    }
+    setLanTestState({ testing: true });
+    const res = await testBackendEndpointConnection(lanUrlInput, lanAnonKeyInput);
+    if (!res.ok) {
+      setLanTestState({
+        testing: false,
+        ok: false,
+        resolvedUrl: res.resolvedUrl,
+        latencyMs: res.latencyMs,
+        message: res.error || 'Serveur local injoignable.',
+      });
+      toast.error('Connexion impossible : vérifiez l’adresse IP et le pare-feu (port 3000) avant d’appliquer.');
+      return;
+    }
+    try {
+      setLocalBackendOverride({
+        enabled: true,
+        url: res.resolvedUrl || lanUrlInput,
+        anonKey: lanAnonKeyInput,
+      });
+      toast.success('Poste basculé sur le Serveur Local. Rechargement...');
+      setTimeout(() => window.location.reload(), 650);
+    } catch (err: any) {
+      setLanTestState({ testing: false, ok: false, message: err?.message });
+      toast.error(err?.message || 'Erreur lors de l’enregistrement.');
+    }
+  };
+
+  const handleResetLanOverride = () => {
+    setLocalBackendOverride({ enabled: false });
+    toast.success('Configuration par défaut restaurée. Rechargement...');
+    setTimeout(() => window.location.reload(), 600);
   };
 
   return (
@@ -608,6 +739,164 @@ export const OfflineDashboard: React.FC<OfflineDashboardProps> = ({ user }) => {
               )}
             </div>
           )}
+        </div>
+      </div>
+
+      {/* Serveur Local d'Établissement (LAN) & Poste Autonome (Docker Hors-ligne) */}
+      <div className="bg-white rounded-xl border border-slate-200/80 p-4 sm:p-5 shadow-xs space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-slate-100">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-lg bg-slate-100 text-slate-700 flex items-center justify-center shrink-0">
+              <Server size={16} />
+            </div>
+            <div>
+              <h2 className="text-sm sm:text-base font-bold text-slate-800">
+                Serveur Local (LAN) &amp; Poste Autonome
+              </h2>
+              <p className="text-[11px] text-slate-500">
+                Mode actif :{' '}
+                <span className="font-semibold text-slate-700">
+                  {runtimeInfo.mode === 'standalone'
+                    ? 'Poste Autonome Local'
+                    : runtimeInfo.mode === 'lan'
+                      ? 'Serveur Local Établissement (LAN)'
+                      : 'EduNova Cloud'}
+                </span>
+                {' · '}
+                {lanStatus?.lanProxyActive ? 'Proxy /local-supabase actif' : 'Connexion directe'}
+                {' · '}
+                {secureContextReady ? 'Coffre AES-256-GCM' : 'Mode Compatibilité LAN HTTP'}
+              </p>
+            </div>
+          </div>
+
+          {runtimeInfo.hasCustomOverride && (
+            <button
+              type="button"
+              onClick={handleResetLanOverride}
+              className="h-8 px-3 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold flex items-center gap-1.5 self-start sm:self-auto whitespace-nowrap"
+            >
+              <RotateCcw size={13} />
+              <span>Revenir par défaut</span>
+            </button>
+          )}
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          {/* Informations d'accès LAN du serveur courant */}
+          <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200/80 space-y-3">
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-xs font-bold text-slate-800">
+                {lanStatus?.lanServerLabel || runtimeInfo.lanServerLabel}
+              </span>
+              {lanStatus?.lanProxyActive && (
+                <span
+                  className={`text-[11px] font-mono font-semibold ${
+                    lanStatus.localSupabaseReachable ? 'text-emerald-700' : 'text-amber-700'
+                  }`}
+                >
+                  {lanStatus.localSupabaseReachable ? 'Base Docker joignable' : 'Base Docker en attente'}
+                </span>
+              )}
+            </div>
+
+            <div className="space-y-1">
+              <div className="text-[11px] text-slate-500">Passerelle de données active sur ce navigateur</div>
+              <div className="font-mono text-[11px] text-slate-800 bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 break-all tabular-nums">
+                {runtimeInfo.activeSupabaseUrl}
+              </div>
+            </div>
+
+            {lanStatus && lanStatus.detectedLanUrls.length > 0 && (
+              <div className="space-y-1.5">
+                <div className="text-[11px] text-slate-500">
+                  {lanStatus.isLoopbackOnly
+                    ? 'Accès Poste Autonome (uniquement sur cet ordinateur) :'
+                    : 'Adresse(s) à saisir sur les autres PC / tablettes de l’école :'}
+                </div>
+                <div className="space-y-1.5">
+                  {(lanStatus.isLoopbackOnly ? [lanStatus.loopbackUrl] : lanStatus.detectedLanUrls).map((urlItem) => (
+                    <div
+                      key={urlItem}
+                      className="flex items-center justify-between gap-2 bg-white border border-slate-200 rounded-lg px-2.5 py-1.5"
+                    >
+                      <span className="font-mono text-xs text-slate-800 tabular-nums truncate">{urlItem}</span>
+                      <button
+                        type="button"
+                        onClick={() => handleCopyLanUrl(urlItem)}
+                        className="h-7 px-2 rounded-md bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] font-semibold flex items-center gap-1 shrink-0"
+                      >
+                        {copiedUrl === urlItem ? <Check size={12} className="text-emerald-600" /> : <Copy size={12} />}
+                        <span>{copiedUrl === urlItem ? 'Copié' : 'Copier'}</span>
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {!secureContextReady && (
+              <p className="text-[11px] text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-2.5 py-1.5 leading-snug">
+                Accès LAN en HTTP : le journal hors-ligne fonctionne en mode compatibilité. Pour activer WebCrypto AES-256 et l’installation PWA sur les tablettes du réseau, activez Caddy HTTPS local.
+              </p>
+            )}
+          </div>
+
+          {/* Formulaire de bascule d'un poste client vers un Serveur Local LAN */}
+          <form onSubmit={handleApplyLanOverride} className="p-3.5 rounded-xl bg-slate-50 border border-slate-200/80 space-y-2.5">
+            <div className="text-xs font-bold text-slate-800">
+              Pointer ce poste vers un Serveur Local d&apos;Établissement
+            </div>
+            <p className="text-[11px] text-slate-500 leading-snug">
+              Utile si vous ouvrez ce client depuis une autre adresse et souhaitez le relier au serveur Docker local de l&apos;école sans Internet.
+            </p>
+
+            <input
+              type="text"
+              value={lanUrlInput}
+              onChange={(e) => setLanUrlInput(e.target.value)}
+              placeholder="Ex: http://192.168.1.100:3000"
+              className="w-full h-9 px-3 rounded-lg border border-slate-300 bg-white text-xs font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            />
+
+            <input
+              type="text"
+              value={lanAnonKeyInput}
+              onChange={(e) => setLanAnonKeyInput(e.target.value)}
+              placeholder="Clé ANON_KEY locale (optionnel si même .env.local)"
+              className="w-full h-9 px-3 rounded-lg border border-slate-300 bg-white text-xs font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            />
+
+            {lanTestState.message && (
+              <div
+                className={`text-[11px] rounded-lg px-2.5 py-1.5 border ${
+                  lanTestState.ok
+                    ? 'bg-emerald-50 border-emerald-200 text-emerald-800'
+                    : 'bg-rose-50 border-rose-200 text-rose-800'
+                }`}
+              >
+                {lanTestState.message}
+              </div>
+            )}
+
+            <div className="flex flex-wrap items-center gap-2 pt-0.5">
+              <button
+                type="button"
+                onClick={handleTestLanConnection}
+                disabled={lanTestState.testing}
+                className="h-9 px-3 rounded-lg bg-white hover:bg-slate-100 border border-slate-300 text-slate-700 text-xs font-semibold whitespace-nowrap disabled:opacity-50"
+              >
+                {lanTestState.testing ? 'Test en cours...' : 'Tester la connexion'}
+              </button>
+              <button
+                type="submit"
+                disabled={lanTestState.testing}
+                className="h-9 px-3.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold whitespace-nowrap disabled:opacity-50"
+              >
+                Appliquer &amp; Reconnecter
+              </button>
+            </div>
+          </form>
         </div>
       </div>
 

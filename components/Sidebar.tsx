@@ -217,6 +217,7 @@ const Sidebar: React.FC<SidebarProps> = ({ user, onLogout }) => {
   const hrRoles = [...adminRoles];
   const academicRoles = [...adminRoles, UserRole.SECRETARY, UserRole.TEACHER, UserRole.SUPERVISOR];
   const restrictedAcademicRoles = [...adminRoles, UserRole.SECRETARY, UserRole.SUPERVISOR];
+  const allStaffRoles = [...adminRoles, UserRole.ACCOUNTANT, UserRole.SECRETARY, UserRole.TEACHER, UserRole.SUPERVISOR];
 
   const hasAccess = React.useCallback((allowedRoles: (UserRole | string)[]) => {
     if (user.role === UserRole.SUPER_ADMIN || user.is_super_admin) return true;
@@ -602,6 +603,12 @@ const Sidebar: React.FC<SidebarProps> = ({ user, onLogout }) => {
                   {renderNavLink({ name: 'Journal d\'Audit', path: '/settings/audit' }, true, History)}
                 </div>
               )}
+            </div>
+          )}
+
+          {hasAccess(allStaffRoles) && (
+            <div className="pt-2">
+              {renderNavLink({ name: 'Mode Local & LAN', path: '/offline', icon: Database })}
             </div>
           )}
 
