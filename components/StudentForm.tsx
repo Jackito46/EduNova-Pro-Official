@@ -11,7 +11,9 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
-import { supabase, isValidUuid } from '../supabase';
+import { supabase, isValidUuid, clearNetworkFailureWindow, isEffectivelyOffline } from '../supabase';
+import { loadEncryptedRefCache, saveEncryptedRefCache } from '../services/offlineEncryptedStore';
+import { FluidLoadingState } from './SkeletonLoader';
 import { useSchool } from '../contexts/SchoolContext';
 import { useFormDraft } from '../hooks/useFormDraft';
 import { useUnsavedChanges } from '../hooks/useUnsavedChanges';
@@ -379,42 +381,28 @@ const StudentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
   }, [formData.dob]);
 
   const loadReferenceData = useCallback(async () => {
-    setLoadingRefs(true);
     setApiError(null);
-    try {
-      let classesQuery = supabase.from('classes').select('*').eq('school_id', user.school_id).order('name');
+    const schoolId = user.school_id;
 
-      const [yearsRes, classesRes, rateRes] = await Promise.all([
-        supabase.from('academic_years')
-          .select('*')
-          .eq('school_id', user.school_id)
-          .order('label', { ascending: true }),
-        classesQuery,
-        supabase.from('exchange_rates').select('*').eq('school_id', user.school_id).order('effective_date', { ascending: false }).limit(1)
-      ]);
-      
-      let resolvedExchangeRate = exchangeRate > 1 && Number.isFinite(exchangeRate) ? exchangeRate : 135;
-      if (rateRes.data && rateRes.data.length > 0) {
-        const fetchedRate = Number(rateRes.data[0].rate_usd_to_htg ?? rateRes.data[0].rate ?? 0);
-        if (fetchedRate > 1 && Number.isFinite(fetchedRate)) {
-          resolvedExchangeRate = fetchedRate;
-          setExchangeRate(fetchedRate);
-        }
-      }
+    const withRefTimeout = <T,>(promise: PromiseLike<T>, ms = 6500): Promise<T> => {
+      let timer: ReturnType<typeof setTimeout>;
+      return Promise.race([
+        Promise.resolve(promise),
+        new Promise<T>((_, reject) => {
+          timer = setTimeout(() => reject(new Error('NETWORK_TIMEOUT')), ms);
+        }),
+      ]).finally(() => clearTimeout(timer));
+    };
 
-      if (yearsRes.error) console.error("Erreur chargement années académiques:", yearsRes.error);
-
-      const allYears = yearsRes.data || [];
-      // Accepter les années actives, planifiées/futures, en préparation ou archivées récentes
+    const applyYearsAndTarget = (allYears: any[]) => {
       const validYears = allYears.filter(y => y.status === 'ACTIVE' || y.status === 'FUTURE' || y.status === 'PLANIFIEE' || y.status === 'PREPARATION' || y.is_active);
       const years = validYears.length > 0 ? validYears : allYears;
       setAcademicYears(years);
-      
+
       const currentActive = years.find(y => y.status === 'ACTIVE' || y.is_active) || allYears.find(y => y.status === 'ACTIVE' || y.is_active);
       setActiveYear(currentActive);
 
       let resolvedTargetYearId = '';
-      // Par défaut, si on réinscrit, on cherche d'abord la session FUTURE / PLANIFIÉE / EN PRÉPARATION, sinon la suivante dans la liste, sinon l'active
       if (isReenroll) {
         const futureYear = years.find(y => y.status === 'FUTURE' || y.status === 'PLANIFIEE' || y.status === 'PREPARATION');
         if (futureYear) {
@@ -422,11 +410,7 @@ const StudentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
         } else if (currentActive) {
           const activeIdx = years.findIndex(y => y.id === currentActive.id);
           const nextYear = years[activeIdx + 1];
-          if (nextYear) {
-            resolvedTargetYearId = nextYear.id;
-          } else {
-            resolvedTargetYearId = currentActive.id;
-          }
+          resolvedTargetYearId = nextYear ? nextYear.id : currentActive.id;
         } else if (years.length > 0) {
           resolvedTargetYearId = years[0].id;
         }
@@ -436,13 +420,121 @@ const StudentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
         resolvedTargetYearId = years[0].id;
       }
       if (resolvedTargetYearId) {
-        setTargetYearId(resolvedTargetYearId);
+        setTargetYearId((prev) => prev || resolvedTargetYearId);
+      }
+      return resolvedTargetYearId;
+    };
+
+    const hydrateRefsFromCache = async () => {
+      const [cachedYears, cachedClasses, cachedRates, cachedStudents] = await Promise.all([
+        loadEncryptedRefCache<any[]>(`ref_${schoolId}_academic_years`, user.id, schoolId),
+        loadEncryptedRefCache<any[]>(`ref_${schoolId}_classes`, user.id, schoolId),
+        loadEncryptedRefCache<any[]>(`ref_${schoolId}_exchange_rates`, user.id, schoolId),
+        id ? loadEncryptedRefCache<any[]>(`ref_${schoolId}_students`, user.id, schoolId) : Promise.resolve(null),
+      ]);
+
+      let hydratedAny = false;
+      if (cachedRates?.data && cachedRates.data.length > 0) {
+        const latestRate = Number(cachedRates.data[0].rate_usd_to_htg ?? cachedRates.data[0].rate ?? 0);
+        if (latestRate > 1 && Number.isFinite(latestRate)) {
+          setExchangeRate(latestRate);
+        }
+      }
+      if (cachedYears?.data && cachedYears.data.length > 0) {
+        applyYearsAndTarget(cachedYears.data);
+        hydratedAny = true;
+      }
+      if (cachedClasses?.data && cachedClasses.data.length > 0) {
+        setDbClasses(cachedClasses.data);
+        hydratedAny = true;
+      }
+      if (id && cachedStudents?.data) {
+        const cachedStudent = cachedStudents.data.find((s: any) => s.id === id);
+        if (cachedStudent) {
+          setFormData((prev) => ({
+            ...prev,
+            lastName: cachedStudent.last_name || '',
+            firstName: cachedStudent.first_name || '',
+            gender: cachedStudent.gender || 'Masculin',
+            dob: cachedStudent.dob || '',
+            pob: cachedStudent.pob || '',
+            nif: cachedStudent.nif || '',
+            address: cachedStudent.address || '',
+            phone: cachedStudent.phone || '',
+            email: cachedStudent.email || '',
+            reference_number: cachedStudent.reference_number || '',
+            parentName: cachedStudent.parent_name || '',
+            parentRelation: cachedStudent.parent_relation || (isAdultLevel ? 'Conjoint(e)' : 'Père'),
+            parentPhone: cachedStudent.parent_phone || '',
+            parentEmail: cachedStudent.parent_email ? (cachedStudent.parent_email.endsWith('@edunova.ht') ? displayIdentifier(cachedStudent.parent_email) : cachedStudent.parent_email) : '',
+            parentJob: cachedStudent.parent_job || '',
+            selectedClassId: isReenroll ? prev.selectedClassId : (cachedStudent.class_id || '')
+          }));
+        }
+      }
+      return { hydratedAny, cachedClasses: cachedClasses?.data || [] };
+    };
+
+    try {
+      const { hydratedAny } = await hydrateRefsFromCache();
+      if (hydratedAny && !id) {
+        setLoadingRefs(false);
+      } else {
+        setLoadingRefs(true);
       }
 
-      if (classesRes.data) setDbClasses(classesRes.data);
+      if (isEffectivelyOffline()) {
+        setLoadingRefs(false);
+        return;
+      }
+
+      const classesQuery = supabase.from('classes').select('*').eq('school_id', schoolId).order('name');
+
+      const [yearsRes, classesRes, rateRes] = await Promise.all([
+        withRefTimeout(
+          supabase.from('academic_years')
+            .select('*')
+            .eq('school_id', schoolId)
+            .order('label', { ascending: true }),
+          6500
+        ),
+        withRefTimeout(classesQuery, 6500),
+        withRefTimeout(
+          supabase.from('exchange_rates').select('*').eq('school_id', schoolId).order('effective_date', { ascending: false }).limit(1),
+          6500
+        )
+      ]);
+      
+      let resolvedExchangeRate = exchangeRate > 1 && Number.isFinite(exchangeRate) ? exchangeRate : 135;
+      if (rateRes.data && rateRes.data.length > 0) {
+        const fetchedRate = Number(rateRes.data[0].rate_usd_to_htg ?? rateRes.data[0].rate ?? 0);
+        if (fetchedRate > 1 && Number.isFinite(fetchedRate)) {
+          resolvedExchangeRate = fetchedRate;
+          setExchangeRate(fetchedRate);
+        }
+        void saveEncryptedRefCache(`ref_${schoolId}_exchange_rates`, rateRes.data, user.id, schoolId);
+      }
+
+      if (yearsRes.error) console.error("Erreur chargement années académiques:", yearsRes.error);
+
+      const allYears = yearsRes.data || [];
+      if (allYears.length > 0) {
+        void saveEncryptedRefCache(`ref_${schoolId}_academic_years`, allYears, user.id, schoolId);
+      }
+      const resolvedTargetYearId = allYears.length > 0 ? applyYearsAndTarget(allYears) : '';
+
+      if (classesRes.data) {
+        setDbClasses(classesRes.data);
+        if (classesRes.data.length > 0) {
+          void saveEncryptedRefCache(`ref_${schoolId}_classes`, classesRes.data, user.id, schoolId);
+        }
+      }
 
       if (id) {
-        const { data: student } = await supabase.from('students').select('*, class:classes(name, level)').eq('id', id).eq('school_id', user.school_id).single();
+        const { data: student } = await withRefTimeout(
+          supabase.from('students').select('*, class:classes(name, level)').eq('id', id).eq('school_id', schoolId).single(),
+          6500
+        );
         if (student) {
           if (currentCampusId && student.campus_id && student.campus_id !== currentCampusId) {
              setApiError("Vous n'avez pas l'autorisation d'éditer ou réinscrire un élève de cette annexe/campus.");
@@ -454,12 +546,15 @@ const StudentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
 
           let debtValue = 0;
           try {
-            const audit = await computeCertifiedStudentArrears({
-              studentId: id,
-              schoolId: user.school_id,
-              excludeYearId: isReenroll ? (resolvedTargetYearId || undefined) : undefined,
-              exchangeRateFallback: resolvedExchangeRate
-            });
+            const audit = await withRefTimeout(
+              computeCertifiedStudentArrears({
+                studentId: id,
+                schoolId,
+                excludeYearId: isReenroll ? (resolvedTargetYearId || undefined) : undefined,
+                exchangeRateFallback: resolvedExchangeRate
+              }),
+              6500
+            );
             debtValue = audit.totalArrears;
             setStudentDebt(debtValue);
           } catch (e) {
@@ -496,7 +591,6 @@ const StudentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
               }
             }
 
-            // Récupération des notes & calcul de la moyenne annuelle pour la réinscription
             let gradesCount = 0;
             let averageGrade: number | null = null;
             let academicStatus: AcademicEvaluationStatus = 'NOTES_EN_ATTENTE';
@@ -504,10 +598,13 @@ const StudentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
             let maxScale = 10;
 
             try {
-              const { data: gradesData } = await supabase
-                .from('grades')
-                .select('score, term')
-                .eq('student_id', id);
+              const { data: gradesData } = await withRefTimeout(
+                supabase
+                  .from('grades')
+                  .select('score, term')
+                  .eq('student_id', id),
+                6000
+              );
 
               if (gradesData && gradesData.length > 0) {
                 const validScores = gradesData
@@ -589,24 +686,46 @@ const StudentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
         }
       }
     } catch (err: any) {
-      setApiError(err.message);
+      await hydrateRefsFromCache();
+      if (!isEffectivelyOffline() && err?.message !== 'NETWORK_TIMEOUT') {
+        setApiError(err.message);
+      }
     } finally {
       setLoadingRefs(false);
     }
-  }, [user.school_id, id, isReenroll, currentCampusId, school?.school_type, school?.global_settings]);
+  }, [user.id, user.school_id, id, isReenroll, currentCampusId, school?.school_type, school?.global_settings]);
 
   useEffect(() => { loadReferenceData(); }, [loadReferenceData]);
+
+  useEffect(() => {
+    const onGlobalRetry = (e: Event) => {
+      e.preventDefault();
+      clearNetworkFailureWindow();
+      void loadReferenceData();
+    };
+    window.addEventListener('edunova_retry_active_view', onGlobalRetry);
+    return () => window.removeEventListener('edunova_retry_active_view', onGlobalRetry);
+  }, [loadReferenceData]);
 
   // Charger les tarifs et réévaluer les arriérés certifiés dès que l'année cible change
   useEffect(() => {
     const fetchFees = async () => {
-      if (!targetYearId) return;
+      if (!targetYearId || !user.school_id) return;
+      const cacheKey = `ref_${user.school_id}_fee_plans_${targetYearId}`;
+      const cachedFees = await loadEncryptedRefCache<any[]>(cacheKey, user.id, user.school_id);
+      if (cachedFees?.data) {
+        setDbFees(cachedFees.data);
+      }
+      if (isEffectivelyOffline()) return;
       const { data } = await supabase.from('fee_plans').select('*').eq('academic_year_id', targetYearId);
-      if (data) setDbFees(data);
+      if (data) {
+        setDbFees(data);
+        void saveEncryptedRefCache(cacheKey, data, user.id, user.school_id);
+      }
     };
-    fetchFees();
+    void fetchFees();
 
-    if (isReenroll && id && user.school_id && targetYearId) {
+    if (isReenroll && id && user.school_id && targetYearId && !isEffectivelyOffline()) {
       let cancelled = false;
       computeCertifiedStudentArrears({
         studentId: id,
@@ -624,7 +743,7 @@ const StudentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
       }).catch(() => {});
       return () => { cancelled = true; };
     }
-  }, [targetYearId, isReenroll, id, user.school_id, exchangeRate]);
+  }, [targetYearId, isReenroll, id, user.id, user.school_id, exchangeRate]);
 
   // Filtrage des classes selon le campus/annexe sélectionné et le cycle
   const classesForStep = useMemo(() => {
@@ -1109,11 +1228,16 @@ const StudentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
 
   if (loadingRefs) {
     return (
-      <div className="min-h-[400px] flex flex-col items-center justify-center p-12 space-y-4">
-        <div className="w-12 h-12 rounded-2xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 animate-pulse">
-          <Loader2 className="animate-spin" size={24} />
-        </div>
-        <p className="text-xs font-semibold text-slate-500">Chargement des données de référence...</p>
+      <div className="min-h-[400px] flex items-center justify-center bg-white rounded-3xl border border-slate-200/80 shadow-xs my-6">
+        <FluidLoadingState
+          message="Chargement des données de référence..."
+          subtext="Préparation des classes, années académiques et barèmes..."
+          onRetry={() => {
+            clearNetworkFailureWindow();
+            void loadReferenceData();
+          }}
+          onUseOfflineCache={() => setLoadingRefs(false)}
+        />
       </div>
     );
   }

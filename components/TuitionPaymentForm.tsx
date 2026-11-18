@@ -44,9 +44,10 @@ import {
   QrCode
 } from 'lucide-react';
 import { StudentDossierAuditModal, SessionAuditDetail } from './StudentDossierAuditModal';
+import { SolvencyMemoBanner, computeSolvencyMemoVisibility } from './SolvencyMemoBanner';
 import { toast } from 'sonner';
 import { formatStudentName } from '../utils/formatters';
-import { supabase } from '../supabase';
+import { supabase, clearNetworkFailureWindow, isEffectivelyOffline } from '../supabase';
 import { useSchool } from '../contexts/SchoolContext';
 import { computeCertifiedStudentArrears } from '../utils/studentDebtAudit';
 import { AuditLogger } from '../utils/auditLogger';
@@ -673,22 +674,36 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
     }
   };
 
-  // 1. CHARGEMENT DU CONTEXTE UTILISATEUR & SESSION (avec fallback chiffré hors-ligne)
+  const [contextRetryNonce, setContextRetryNonce] = useState(0);
+
+  // 1. CHARGEMENT DU CONTEXTE UTILISATEUR & SESSION (cache-first + parallèle avec timeout)
   useEffect(() => {
+    let active = true;
+
+    const withContextTimeout = <T,>(promise: PromiseLike<T>, ms = 6500): Promise<T> => {
+      let timer: ReturnType<typeof setTimeout>;
+      return Promise.race([
+        Promise.resolve(promise),
+        new Promise<T>((_, reject) => {
+          timer = setTimeout(() => reject(new Error('NETWORK_TIMEOUT')), ms);
+        }),
+      ]).finally(() => clearTimeout(timer));
+    };
+
     const fetchContext = async () => {
       const applyAcademicYears = (years: any[]) => {
         if (!years || years.length === 0) return;
         setAcademicYears(years);
-        const active = years.find(y => y.status === 'ACTIVE' || y.is_active) || years[0];
-        setActiveYear(active);
+        const activeYearFound = years.find(y => y.status === 'ACTIVE' || y.is_active) || years[0];
+        setActiveYear(activeYearFound);
 
         if (!userSelectedYearRef.current) {
           const searchParams = new URLSearchParams(location.search);
           const requestedYearId = location.state?.academicYearId || searchParams.get('academicYearId') || searchParams.get('yearId');
           if (requestedYearId && years.some(y => y.id === requestedYearId)) {
             setTargetYearId(prev => prev || requestedYearId);
-          } else if (active) {
-            setTargetYearId(prev => prev || active.id);
+          } else if (activeYearFound) {
+            setTargetYearId(prev => prev || activeYearFound.id);
           }
         }
       };
@@ -703,7 +718,7 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
         setCurrentExchangeRate(sorted[0].rate_usd_to_htg || sorted[0].rate || 132.50);
       };
 
-      const loadContextOffline = async () => {
+      const loadContextOffline = async (): Promise<boolean> => {
         try {
           const cachedSchool = JSON.parse(localStorage.getItem(`edunova_cached_school_${user.school_id}`) || 'null');
           if (cachedSchool) setSchoolDetails(cachedSchool);
@@ -714,12 +729,13 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
           loadEncryptedRefCache<any[]>(`ref_${user.school_id}_exchange_rates`, user.id, user.school_id),
           loadEncryptedRefCache<any[]>(`ref_${user.school_id}_academic_years`, user.id, user.school_id),
         ]);
+        if (!active) return false;
         if (cachedRates?.data) applyExchangeRates(cachedRates.data);
         if (cachedYears?.data) applyAcademicYears(cachedYears.data);
+        return Boolean((cachedYears?.data && cachedYears.data.length > 0) || (cachedRates?.data && cachedRates.data.length > 0));
       };
 
       try {
-        setLoading(true);
         if (!user?.school_id) {
           setLoading(false);
           return;
@@ -727,63 +743,84 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
 
         setCashierName(user.full_name || '');
 
-        if (typeof navigator !== 'undefined' && !navigator.onLine) {
-          await loadContextOffline();
+        // Hydratation immédiate depuis le cache chiffré local (<50ms)
+        const hasCachedContext = await loadContextOffline();
+        if (!active) return;
+        if (hasCachedContext) {
+          setLoading(false);
+        } else {
+          setLoading(true);
+        }
+
+        if (isEffectivelyOffline()) {
+          setLoading(false);
           return;
         }
 
-        const { data: schoolData, error: schoolError } = await supabase
-          .from('schools')
-          .select('name, address, phone, logo_url, global_settings')
-          .eq('id', user.school_id)
-          .single();
+        const [schoolRes, rateRes, yearsRes] = await Promise.all([
+          withContextTimeout(
+            supabase
+              .from('schools')
+              .select('name, address, phone, logo_url, global_settings')
+              .eq('id', user.school_id)
+              .single(),
+            6500
+          ).catch((e) => ({ data: null, error: e })),
+          withContextTimeout(
+            supabase
+              .from('exchange_rates')
+              .select('*')
+              .eq('school_id', user.school_id),
+            6500
+          ).catch((e) => ({ data: null, error: e })),
+          withContextTimeout(
+            supabase
+              .from('academic_years')
+              .select('*')
+              .eq('school_id', user.school_id)
+              .order('label', { ascending: false }),
+            6500
+          ).catch((e) => ({ data: null, error: e })),
+        ]);
 
-        if (schoolError && isTransientNetworkError(schoolError)) {
-          await loadContextOffline();
-          return;
+        if (!active) return;
+
+        if (schoolRes.data) {
+          setSchoolDetails(schoolRes.data);
         }
-        if (schoolData) setSchoolDetails(schoolData);
 
-        // Fetch exchange rate
-        try {
-          const { data: rateData, error: rateError } = await supabase
-            .from('exchange_rates')
-            .select('*')
-            .eq('school_id', user.school_id);
-          
-          if (rateError) {
-            console.error("Erreur chargement taux de change:", rateError);
-          } else if (rateData && rateData.length > 0) {
-            applyExchangeRates(rateData);
-            void saveEncryptedRefCache(`ref_${user.school_id}_exchange_rates`, rateData, user.id, user.school_id);
-          }
-        } catch (e) {
-          console.error("Exception taux de change:", e);
+        if (rateRes.data && rateRes.data.length > 0) {
+          applyExchangeRates(rateRes.data);
+          void saveEncryptedRefCache(`ref_${user.school_id}_exchange_rates`, rateRes.data, user.id, user.school_id);
         }
 
-        const { data: years, error: yearsError } = await supabase
-          .from('academic_years')
-          .select('*')
-          .eq('school_id', user.school_id)
-          .order('label', { ascending: false });
-        
-        if (yearsError) console.error("Erreur chargement années académiques:", yearsError);
-
-        if (years) {
-          applyAcademicYears(years);
-          void saveEncryptedRefCache(`ref_${user.school_id}_academic_years`, years, user.id, user.school_id);
-        } else if (yearsError && isTransientNetworkError(yearsError)) {
+        if (yearsRes.data && yearsRes.data.length > 0) {
+          applyAcademicYears(yearsRes.data);
+          void saveEncryptedRefCache(`ref_${user.school_id}_academic_years`, yearsRes.data, user.id, user.school_id);
+        } else if (!hasCachedContext && yearsRes.error && isTransientNetworkError(yearsRes.error)) {
           await loadContextOffline();
         }
       } catch (err) {
         console.error("Context load error:", err);
         await loadContextOffline();
       } finally {
-        setLoading(false);
+        if (active) setLoading(false);
       }
     };
-    fetchContext();
-  }, [user?.id, user?.school_id]);
+    void fetchContext();
+
+    const handleGlobalRetry = (e: Event) => {
+      e.preventDefault();
+      clearNetworkFailureWindow();
+      setContextRetryNonce((n) => n + 1);
+    };
+    window.addEventListener('edunova_retry_active_view', handleGlobalRetry);
+
+    return () => {
+      active = false;
+      window.removeEventListener('edunova_retry_active_view', handleGlobalRetry);
+    };
+  }, [user?.id, user?.school_id, contextRetryNonce]);
 
   // 2. MOTEUR DE RECHERCHE ÉTUDIANTS (En ligne RPC + Fallback Hors-ligne Chiffré)
   useEffect(() => {
@@ -995,12 +1032,17 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
         curAdHocDue = curAdHocPaid;
       }
 
+      const curAdHocRemaining = Math.max(0, curAdHocDue - curAdHocPaid);
       const curSessionTotalDue = curAdmBal.effectiveDueHTG + curMiscBal.effectiveDueHTG + curTuitionBal.effectiveDueHTG + curAdHocDue;
       const curSessionTotalPaid = curAdmBal.paidHTGEquiv + curMiscBal.paidHTGEquiv + curTuitionBal.paidHTGEquiv + curAdHocPaid;
-      const curSessionRemaining = curAdmBal.remainingHTGEquiv + curMiscBal.remainingHTGEquiv + curTuitionBal.remainingHTGEquiv + Math.max(0, curAdHocDue - curAdHocPaid);
+      const curSessionRemaining = curAdmBal.remainingHTGEquiv + curMiscBal.remainingHTGEquiv + curTuitionBal.remainingHTGEquiv + curAdHocRemaining;
       const curNetSessionDiff = curSessionTotalDue - curSessionTotalPaid;
-      const curSolvent = curSessionRemaining <= 50 || curNetSessionDiff <= 50;
-      const curTrueRemaining = curSolvent ? 0 : Math.min(Math.round(curSessionRemaining), Math.max(0, Math.round(curNetSessionDiff)));
+      const curNetRemaining = Math.min(Math.round(curSessionRemaining), Math.max(0, Math.round(curNetSessionDiff)));
+      const curEffectiveRemaining = curAdHocRemaining > 0
+        ? Math.max(Math.round(curAdHocRemaining), curNetRemaining)
+        : curNetRemaining;
+      const curSolvent = curEffectiveRemaining <= 50;
+      const curTrueRemaining = curSolvent ? 0 : curEffectiveRemaining;
 
       const currentSessionDetail: SessionAuditDetail = {
         academicYearId: targetYearId,
@@ -1954,7 +1996,7 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
         setParentPhoneCustom(data.parent_phone || data.phone || '');
         setPayerPhoneCustom(data.parent_phone || data.phone || '');
         setIsLocked(true);
-        auditStudentDossierInDepth(data, yearId, enrollment, otherEnrollments, allStudentPayments, plan, campaignsList, currentSeq);
+        await auditStudentDossierInDepth(data, yearId, enrollment, otherEnrollments, allStudentPayments, plan, campaignsList, currentSeq);
       }
     } catch (err) {
       console.error("Load details error:", err);
@@ -3551,6 +3593,13 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
     selectedStudent && !isCurrentTargetFuture
       ? (rawCurrentSessionRemaining <= 50 ? 0 : Math.round(rawCurrentSessionRemaining))
       : 0;
+  const solvencyMemoVisibility = computeSolvencyMemoVisibility({
+    hasSelectedStudent: Boolean(selectedStudent),
+    isLoading: loadingDebt,
+    globalDebt,
+    currentSessionDebt: currentSessionNonFutureDebt,
+    isNotEnrolledInTargetYear: Boolean(selectedStudent?.isNotEnrolledInTargetYear)
+  });
 
   if (apiError && !selectedStudent) {
     return (
@@ -3660,6 +3709,11 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
                 <FluidLoadingState 
                   message="Initialisation du module finance..." 
                   subtext="Synchronisation des dettes et tarifs..." 
+                  onRetry={() => {
+                    clearNetworkFailureWindow();
+                    setContextRetryNonce((n) => n + 1);
+                  }}
+                  onUseOfflineCache={() => setLoading(false)}
                 />
                 <SkeletonTable rows={4} />
               </div>
@@ -3834,25 +3888,15 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
                         );
                       })()}
                       <div className="mt-2.5 pt-2 border-t border-slate-200/60 flex items-center justify-between flex-wrap gap-2">
-                        {globalDebt > 0 ? (
-                          <div className="flex items-center gap-1.5 text-xs text-slate-500 font-medium">
-                            <ShieldAlert size={13} className="text-rose-600" />
-                            <span>Audit Historique : </span>
-                            <strong className="text-rose-700 font-bold">
-                              {`${globalDebt.toLocaleString()} HTG d'arriérés`}
-                            </strong>
-                          </div>
-                        ) : !loadingDebt && currentSessionNonFutureDebt > 0 ? (
-                          <div className="flex items-center gap-1.5 text-xs text-slate-500 font-medium">
-                            <AlertTriangle size={13} className="text-amber-600" />
-                            <span>Reliquat à solder ({currentSessionAudit?.academicYearLabel || targetAcademicYearObj?.label || 'Session'}) : </span>
-                            <strong className="text-amber-700 font-bold">
-                              {`${currentSessionNonFutureDebt.toLocaleString()} HTG`}
-                            </strong>
-                          </div>
-                        ) : (
-                          <div />
-                        )}
+                        <SolvencyMemoBanner
+                          visible={solvencyMemoVisibility.showCompactMemo}
+                          variant="compact"
+                          globalDebt={globalDebt}
+                          currentSessionDebt={currentSessionNonFutureDebt}
+                          sessionLabel={currentSessionAudit?.academicYearLabel || targetAcademicYearObj?.label || 'Session'}
+                          studentTerm={terminology.student}
+                          onOpenDossierAudit={() => setIsDossierModalOpen(true)}
+                        />
                         <button
                           type="button"
                           onClick={() => setIsDossierModalOpen(true)}
@@ -4699,92 +4743,28 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
                 )}
               </div>
               
-              {globalDebt > 0 ? (
-                <div className="bg-rose-50/80 p-3.5 rounded-2xl border border-rose-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-xs">
-                  <div className="flex items-start gap-2.5">
-                    <AlertTriangle className="text-rose-600 mt-0.5 shrink-0" size={16} />
-                    <div>
-                      <p className="text-[11px] sm:text-xs text-rose-900 font-semibold leading-relaxed">
-                        <strong className="font-bold">Arriérés Confirmés :</strong> L'{terminology.student.toLowerCase()} a une dette réelle de {globalDebt.toLocaleString()} HTG sur son historique ({dossierAuditSessions.filter(s => !s.isCurrentSession && !s.isFutureSession && s.remainingDebt > 0).map(s => s.academicYearLabel).join(', ') || 'session(s) précédente(s)'}).
-                      </p>
-                      <p className="text-[10.5px] text-rose-700 mt-0.5">
-                        Assurez-vous d'imputer le paiement à la bonne session ou de régulariser ces arriérés.
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
-                    {(() => {
-                      const firstDebtSession = dossierAuditSessions.find(s => !s.isCurrentSession && !s.isFutureSession && s.remainingDebt > 0);
-                      if (!firstDebtSession?.academicYearId) return null;
-                      return (
-                        <button
-                          type="button"
-                          onClick={() => handleSelectTargetYear(firstDebtSession.academicYearId)}
-                          className="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold rounded-xl shrink-0 transition-all cursor-pointer shadow-xs whitespace-nowrap"
-                        >
-                          Régler {firstDebtSession.academicYearLabel}
-                        </button>
-                      );
-                    })()}
-                    <button
-                      type="button"
-                      onClick={() => setIsDossierModalOpen(true)}
-                      className="px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold rounded-xl shrink-0 transition-all flex items-center gap-1.5 cursor-pointer shadow-xs whitespace-nowrap"
-                    >
-                      <FileText size={13} /> Examiner le dossier
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                !loadingDebt && selectedStudent && (
-                  selectedStudent.isNotEnrolledInTargetYear ? (
-                    <div className="bg-blue-50/80 p-3.5 rounded-2xl border border-blue-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-xs">
-                      <div className="flex items-start gap-2.5">
-                        <CheckCircle2 className="text-blue-600 mt-0.5 shrink-0" size={16} />
-                        <div>
-                          <p className="text-[11px] sm:text-xs text-blue-900 font-semibold leading-relaxed">
-                            <strong className="font-bold">Régularisation d'Inscription :</strong> Le montant saisi sera imputé directement {selectedStudent.isReenrollment ? 'aux frais de réinscription' : "aux frais d'inscription"} de la session ciblée ({targetAcademicYearObj?.label || 'Session active'}).
-                          </p>
-                          <p className="text-[10.5px] text-blue-700 mt-0.5">
-                            {selectedStudent.isReenrollment ? 'Frais de réinscription de la session : ' : "Frais d'inscription de la session : "}
-                            {selectedStudent.inscriptionDue === 0 ? 'Exonéré / 0 HTG (Offert)' : `${(selectedStudent.inscriptionDue ?? 0).toLocaleString()} HTG`}.
-                          </p>
-                        </div>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => setIsDossierModalOpen(true)}
-                        className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl shrink-0 transition-all flex items-center gap-1.5 cursor-pointer shadow-xs self-end sm:self-center"
-                      >
-                        <FileText size={13} /> Réviser le dossier
-                      </button>
-                    </div>
-                  ) : currentSessionNonFutureDebt > 0 ? (
-                    <div className="bg-amber-50/80 p-3.5 rounded-2xl border border-amber-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-xs">
-                      <div className="flex items-start gap-2.5">
-                        <AlertTriangle className="text-amber-600 mt-0.5 shrink-0" size={16} />
-                        <div>
-                          <p className="text-[11px] sm:text-xs text-amber-950 font-medium leading-relaxed">
-                            <strong className="font-bold">Reliquat à finaliser :</strong> L'{terminology.student.toLowerCase()} a encore un solde de <strong className="font-bold font-mono">{currentSessionNonFutureDebt.toLocaleString()} HTG</strong> à acquitter pour solder la session {currentSessionAudit?.academicYearLabel || targetAcademicYearObj?.label || 'active'}.
-                          </p>
-                          {selectedStudent.otherEnrollments?.some((e: any) => e.academic_year?.status === 'FUTURE') && (
-                            <p className="text-[10.5px] text-amber-800 mt-0.5">
-                              Pré-inscrit(e) pour la future session ({selectedStudent.otherEnrollments.find((e: any) => e.academic_year?.status === 'FUTURE')?.academic_year?.label || 'Prochaine session'}) — ce reliquat reste dû avant clôture complète.
-                            </p>
-                          )}
-                        </div>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => setIsDossierModalOpen(true)}
-                        className="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold rounded-xl shrink-0 transition-all flex items-center gap-1.5 cursor-pointer shadow-xs self-end sm:self-center whitespace-nowrap"
-                      >
-                        <FileText size={13} /> Examiner le dossier
-                      </button>
-                    </div>
-                  ) : null
-                )
-              )}
+              <SolvencyMemoBanner
+                visible={solvencyMemoVisibility.showDetailedMemo}
+                variant="detailed"
+                globalDebt={globalDebt}
+                currentSessionDebt={currentSessionNonFutureDebt}
+                sessionLabel={currentSessionAudit?.academicYearLabel || targetAcademicYearObj?.label || (selectedStudent?.isNotEnrolledInTargetYear ? 'Session active' : 'active')}
+                studentTerm={terminology.student}
+                isNotEnrolledInTargetYear={Boolean(selectedStudent?.isNotEnrolledInTargetYear)}
+                isReenrollment={Boolean(selectedStudent?.isReenrollment)}
+                inscriptionDue={selectedStudent?.inscriptionDue ?? 0}
+                pastArrearsSessionLabels={dossierAuditSessions
+                  .filter(s => !s.isCurrentSession && !s.isFutureSession && s.remainingDebt > 0)
+                  .map(s => s.academicYearLabel)}
+                firstArrearsSession={
+                  dossierAuditSessions.find(s => !s.isCurrentSession && !s.isFutureSession && s.remainingDebt > 0) || null
+                }
+                futureEnrollmentLabel={
+                  selectedStudent?.otherEnrollments?.find((e: any) => e.academic_year?.status === 'FUTURE')?.academic_year?.label || null
+                }
+                onSelectTargetYear={handleSelectTargetYear}
+                onOpenDossierAudit={() => setIsDossierModalOpen(true)}
+              />
 
               {loadingDebt && (
                 <div className="flex items-center gap-2 px-3 py-2 bg-slate-50 rounded-xl border border-slate-200">

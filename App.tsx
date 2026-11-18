@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef, useTransition } from 'react';
+import React, { useState, useEffect, useCallback, useRef, startTransition } from 'react';
 import { HashRouter } from 'react-router-dom';
 import { ShieldAlert, RefreshCw, Clock } from 'lucide-react';
 import { Toaster, toast } from 'sonner';
@@ -9,7 +9,7 @@ import { ErrorBoundary } from './components/ErrorBoundary';
 import { useSecurity } from './components/SecurityGuard';
 import Logo from './components/Logo';
 import { AppLoadingScreen } from './components/AppLoadingScreen';
-import { lazyWithRetry } from './utils/lazyWithRetry';
+import { lazyWithRetry, safePreloadModule } from './utils/lazyWithRetry';
 import { ensureOfflineVaultUnlocked, lockOfflineVault } from './services/offlineEncryptedStore';
 import { initOfflineSyncAutoFlush, prefetchSchoolReferenceCache } from './services/offlineSyncEngine';
 
@@ -187,14 +187,13 @@ const App: React.FC = () => {
     }
   });
   const [pendingPublicView, setPendingPublicView] = useState<PublicView | null>(null);
-  const [isViewTransitionPending, startViewTransition] = useTransition();
   const suppressHashSyncRef = useRef(false);
 
   const switchPublicView = useCallback((target: PublicView, options?: { skipScrollReset?: boolean }) => {
     if (target === 'login') {
-      void loadLogin();
+      void safePreloadModule(loadLogin);
     } else {
-      void loadPublicLandingPage();
+      void safePreloadModule(loadPublicLandingPage);
     }
 
     const targetHash = target === 'login' ? '#/login' : '#/';
@@ -212,16 +211,16 @@ const App: React.FC = () => {
     }
 
     setPendingPublicView(target);
-    startViewTransition(() => {
+    startTransition(() => {
       setPublicView(target);
     });
   }, []);
 
   useEffect(() => {
-    if (!isViewTransitionPending && pendingPublicView !== null) {
+    if (pendingPublicView !== null && publicView === pendingPublicView) {
       setPendingPublicView(null);
     }
-  }, [isViewTransitionPending, pendingPublicView]);
+  }, [pendingPublicView, publicView]);
 
   useEffect(() => {
     const syncHashToView = () => {
@@ -230,8 +229,8 @@ const App: React.FC = () => {
         const h = window.location.hash || '';
         const parsed = parsePublicViewFromHash(h);
         if (parsed === 'login') {
-          void loadLogin();
-          startViewTransition(() => {
+          void safePreloadModule(loadLogin);
+          startTransition(() => {
             setPublicView('login');
           });
         } else if (
@@ -242,8 +241,8 @@ const App: React.FC = () => {
           h.startsWith('#/demo')
         ) {
           if (!user) {
-            void loadPublicLandingPage();
-            startViewTransition(() => {
+            void safePreloadModule(loadPublicLandingPage);
+            startTransition(() => {
               setPublicView('landing');
             });
           }
@@ -450,6 +449,9 @@ const App: React.FC = () => {
     // 4. Verrouillage immédiat du coffre hors-ligne en RAM & déconnexion locale instantanée
     lockOfflineVault();
     try { window.localStorage.setItem('edunova_logged_out', 'true'); } catch (e) {}
+    isWarningShowing.current = false;
+    setShowInactivityWarning(false);
+    setCountdown(60);
     setUser(null);
     setLoading(false);
     setIsExiting(false);
@@ -925,8 +927,9 @@ const App: React.FC = () => {
 
     const performInactivityLogout = () => {
       console.warn("Déconnexion forcée pour inactivité prolongée.");
-      isWarningShowing.current = true;
+      isWarningShowing.current = false;
       setShowInactivityWarning(false);
+      setCountdown(60);
       try {
         window.sessionStorage.setItem('edunova_login_notice', "Votre session a été fermée automatiquement pour des raisons de sécurité suite à une période d'inactivité prolongée.");
       } catch (e) {}
@@ -954,6 +957,7 @@ const App: React.FC = () => {
         if (isWarningShowing.current) {
           isWarningShowing.current = false;
           setShowInactivityWarning(false);
+          setCountdown(60);
         }
       }
     };
@@ -1149,22 +1153,25 @@ const App: React.FC = () => {
   }, [userId, userRole, purgeSystemState, sessionTimeoutMinutes, maintenanceMode]);
 
   useEffect(() => {
-    let interval: NodeJS.Timeout;
-    if (showInactivityWarning) {
-      setCountdown((prev) => (prev > 0 ? prev : 60));
-      interval = setInterval(() => {
-        setCountdown((prev) => {
-          if (prev <= 1) {
-            clearInterval(interval);
-            purgeSystemState();
-            return 0;
-          }
-          return prev - 1;
-        });
-      }, 1000);
+    if (!showInactivityWarning) {
+      return;
     }
-    return () => clearInterval(interval);
-  }, [showInactivityWarning, purgeSystemState]);
+
+    if (countdown <= 0) {
+      setCountdown(60);
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      if (countdown <= 1) {
+        purgeSystemState();
+      } else {
+        setCountdown(countdown - 1);
+      }
+    }, 1000);
+
+    return () => clearTimeout(timer);
+  }, [showInactivityWarning, countdown, purgeSystemState]);
 
   if (isExiting) {
     return (
@@ -1209,8 +1216,8 @@ const App: React.FC = () => {
             <div key="public-landing" className="edunova-fade-in">
               <PublicLandingPage
                 onOpenLogin={() => switchPublicView('login')}
-                onPreloadLogin={() => { void loadLogin(); }}
-                isOpeningLogin={isViewTransitionPending && pendingPublicView === 'login'}
+                onPreloadLogin={() => { void safePreloadModule(loadLogin); }}
+                isOpeningLogin={pendingPublicView === 'login'}
               />
             </div>
           ) : (
@@ -1219,7 +1226,7 @@ const App: React.FC = () => {
                 <Login
                   onLogin={(u) => {
                     try { window.sessionStorage.removeItem('edunova_login_in_progress'); } catch(e){}
-                    void loadAuthenticatedShell();
+                    void safePreloadModule(loadAuthenticatedShell);
                     if (window.location.hash !== '#/') {
                       suppressHashSyncRef.current = true;
                       window.location.hash = '#/';
@@ -1228,16 +1235,16 @@ const App: React.FC = () => {
                       }, 0);
                     }
                     window.scrollTo({ top: 0, behavior: 'auto' });
-                    startViewTransition(() => {
+                    startTransition(() => {
                       setUser(u);
                       setLoading(false);
                     });
                   }}
                   onReset={purgeSystemState}
                   onBackToLanding={() => switchPublicView('landing')}
-                  onPreloadLanding={() => { void loadPublicLandingPage(); }}
-                  onLoginStart={() => { void loadAuthenticatedShell(); }}
-                  isReturningToLanding={isViewTransitionPending && pendingPublicView === 'landing'}
+                  onPreloadLanding={() => { void safePreloadModule(loadPublicLandingPage); }}
+                  onLoginStart={() => { void safePreloadModule(loadAuthenticatedShell); }}
+                  isReturningToLanding={pendingPublicView === 'landing'}
                 />
               </HashRouter>
             </div>

@@ -63,18 +63,20 @@ function renderServiceWorkerHashPlugin(deployHash: string, buildTimestamp: strin
         console.warn('⚠️ [Vite Build] Pré-compression .br/.gz ignorée:', compErr);
       }
 
-      // Synchronisation universelle des artefacts (dist -> build & .output/public)
-      try {
-        const buildDir = path.resolve(__dirname, 'build');
-        const outputPublicDir = path.resolve(__dirname, '.output', 'public');
-        if (fs.existsSync(distDir)) {
-          fs.cpSync(distDir, buildDir, { recursive: true });
-          fs.mkdirSync(outputPublicDir, { recursive: true });
-          fs.cpSync(distDir, outputPublicDir, { recursive: true });
-          console.log('✅ [Vite Build] Artefacts synchronisés (avec .br/.gz) vers dist/, build/ et .output/public');
+      // Synchronisation universelle des artefacts (dist -> build & .output/public) si activée
+      if (process.env.SYNC_EXTRA_BUILD_DIRS === 'true') {
+        try {
+          const buildDir = path.resolve(__dirname, 'build');
+          const outputPublicDir = path.resolve(__dirname, '.output', 'public');
+          if (fs.existsSync(distDir)) {
+            fs.cpSync(distDir, buildDir, { recursive: true });
+            fs.mkdirSync(outputPublicDir, { recursive: true });
+            fs.cpSync(distDir, outputPublicDir, { recursive: true });
+            console.log('✅ [Vite Build] Artefacts synchronisés (avec .br/.gz) vers dist/, build/ et .output/public');
+          }
+        } catch (err) {
+          console.warn('⚠️ [Vite Build] Notice synchronisation artefacts:', err);
         }
-      } catch (err) {
-        console.warn('⚠️ [Vite Build] Notice synchronisation artefacts:', err);
       }
     }
   };

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { 
   Search, Edit2, Trash2, Sparkles, User, Users, 
@@ -8,7 +8,7 @@ import {
   Clock, XCircle, FileWarning, Filter, FileText
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { supabase } from '../supabase';
+import { supabase, clearNetworkFailureWindow, isEffectivelyOffline } from '../supabase';
 import { geminiService } from '../services/geminiService';
 import { UserProfile, SchoolLevel, UserRole } from '../types';
 import { useSchool } from '../contexts/SchoolContext';
@@ -42,8 +42,12 @@ const StudentList: React.FC<{ user: UserProfile }> = ({ user }) => {
   const [academicYears, setAcademicYears] = useState<any[]>([]);
   const [selectedYearId, setSelectedYearId] = useState<string>('all');
   const [loading, setLoading] = useState(true);
+  const [isRefreshingInBackground, setIsRefreshingInBackground] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isOfflineData, setIsOfflineData] = useState(false);
+  const hasHydratedCacheRef = useRef(false);
+  const studentsCountRef = useRef(0);
+  studentsCountRef.current = students.length;
   
   const [aiReport, setAiReport] = useState<{id: string, text: string} | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
@@ -70,69 +74,200 @@ const StudentList: React.FC<{ user: UserProfile }> = ({ user }) => {
     prefetchRouteChunk('/eleves/detail');
   }, []);
 
+  const withQueryTimeout = useCallback(<T,>(promise: PromiseLike<T>, ms = 7000): Promise<T> => {
+    let timer: ReturnType<typeof setTimeout>;
+    return Promise.race([
+      Promise.resolve(promise),
+      new Promise<T>((_, reject) => {
+        timer = setTimeout(() => reject(new Error('NETWORK_TIMEOUT')), ms);
+      }),
+    ]).finally(() => clearTimeout(timer));
+  }, []);
+
+  const applyYearsAndClasses = useCallback((rawYears: any[] | null, rawClasses: any[] | null) => {
+    let finalYears = rawYears || [];
+    if (finalYears.length === 0) {
+      finalYears = [
+        { id: 'ay-2025-2026', label: '2025-2026', status: 'ACTIVE', is_active: true },
+        { id: 'ay-2024-2025', label: '2024-2025', status: 'PAST', is_active: false },
+      ];
+    }
+    const filtered = finalYears.filter((y) => y.status === 'ACTIVE' || y.status === 'FUTURE' || y.is_active);
+    const activeYears = filtered.length > 0 ? filtered : finalYears;
+    setAcademicYears(activeYears);
+
+    const locationState = location.state as { academicYearId?: string; filterYearId?: string } | null;
+    const incomingYearId = locationState?.academicYearId || locationState?.filterYearId;
+    const targetYear = incomingYearId
+      ? activeYears.find((y) => y.id === incomingYearId) ||
+        activeYears.find((y) => y.status === 'ACTIVE' || y.is_active) ||
+        activeYears[0]
+      : activeYears.find((y) => y.status === 'ACTIVE' || y.is_active) || activeYears[0];
+    if (targetYear) setSelectedYearId((prev) => (prev === 'all' ? targetYear.id : prev));
+
+    const scopedClasses = (rawClasses || []).filter(
+      (c: any) => !currentCampusId || c.campus_id === currentCampusId || !c.campus_id
+    );
+    setClasses(scopedClasses);
+    return { activeYears, targetYearId: targetYear?.id || 'all' };
+  }, [currentCampusId, location.state]);
+
+  const enrichAndSetStudents = useCallback((
+    rawStudents: any[],
+    rawEnrollments: any[],
+    overrideYearId?: string,
+    overrideYears?: any[]
+  ) => {
+    const activeYearId = overrideYearId ?? selectedYearId;
+    const yearsList = overrideYears ?? academicYears;
+    const isYearFiltered = Boolean(activeYearId && activeYearId !== 'all');
+
+    let filteredStudents = rawStudents || [];
+    if (currentCampusId) {
+      filteredStudents = filteredStudents.filter((s: any) => !s.campus_id || s.campus_id === currentCampusId);
+    }
+
+    const enrollmentMap = new Map<string, string[]>();
+    const statusMap = new Map<string, string>();
+    const yearEnrolledIds = new Set<string>();
+
+    (rawEnrollments || []).forEach((e: any) => {
+      const list = enrollmentMap.get(e.student_id) || [];
+      list.push(e.academic_year_id);
+      enrollmentMap.set(e.student_id, list);
+      if (isYearFiltered && e.academic_year_id === activeYearId) {
+        statusMap.set(e.student_id, e.status);
+        if (e.student_id) yearEnrolledIds.add(e.student_id);
+      }
+    });
+
+    if (isYearFiltered && (rawEnrollments || []).length > 0) {
+      filteredStudents = filteredStudents.filter((s: any) => yearEnrolledIds.has(s.id));
+    }
+
+    const currentSelectedYear = yearsList.find((y) => y.id === activeYearId);
+    const isFutureSession = currentSelectedYear?.status === 'FUTURE';
+
+    const enrichedStudents = filteredStudents.map((s) => {
+      const history = enrollmentMap.get(s.id) || [];
+      const isReturning = isYearFiltered
+        ? history.length > 1 && history.includes(activeYearId)
+        : history.length > 1;
+
+      let age = null;
+      let ageStatus = 'NORMAL';
+      if (s.dob) {
+        const birthDate = new Date(s.dob);
+        const refDate = new Date(new Date().getFullYear(), 8, 1);
+        age = refDate.getFullYear() - birthDate.getFullYear();
+        const m = refDate.getMonth() - birthDate.getMonth();
+        if (m < 0 || (m === 0 && refDate.getDate() < birthDate.getDate())) {
+          age--;
+        }
+        if (s.class) {
+          ageStatus = getStudentAgeStatus(age, s.class.name, s.class.level);
+        }
+      }
+
+      const targetStatus = statusMap.get(s.id) || s.status || 'ACTIVE';
+      const normalizedDocs = normalizeStudentDocuments(
+        s.submitted_documents,
+        school?.school_type,
+        school?.global_settings
+      );
+      const completeness = calculateDocumentsCompleteness(
+        normalizedDocs,
+        school?.school_type,
+        school?.global_settings
+      );
+
+      let displayEnrollmentType = isReturning ? 'Réinscrit' : 'Inscrit';
+      if (isFutureSession) {
+        displayEnrollmentType = isReturning ? 'Réinscrit (Pré-ins)' : 'Pré-inscrit';
+      }
+
+      return {
+        ...s,
+        age,
+        ageStatus,
+        enrollmentType: displayEnrollmentType,
+        enrollmentStatus: targetStatus,
+        normalizedDocs,
+        completeness,
+      };
+    });
+
+    setStudents(enrichedStudents);
+    return enrichedStudents.length;
+  }, [selectedYearId, academicYears, currentCampusId, school?.school_type, school?.global_settings]);
+
+  const hydrateFromEncryptedCache = useCallback(async (forceOfflineFlag = false) => {
+    if (!user?.school_id) return false;
+    const schoolId = user.school_id;
+    const [cachedYears, cachedClasses, cachedStudents, cachedEnrollments] = await Promise.all([
+      loadEncryptedRefCache<any[]>(`ref_${schoolId}_academic_years`, user.id, schoolId),
+      loadEncryptedRefCache<any[]>(`ref_${schoolId}_classes`, user.id, schoolId),
+      loadEncryptedRefCache<any[]>(`ref_${schoolId}_students`, user.id, schoolId),
+      loadEncryptedRefCache<any[]>(`ref_${schoolId}_enrollments`, user.id, schoolId),
+    ]);
+
+    const { activeYears, targetYearId } = applyYearsAndClasses(
+      cachedYears?.data || null,
+      cachedClasses?.data || null
+    );
+
+    const hasStudentsCache = Boolean(cachedStudents?.data && cachedStudents.data.length > 0);
+    if (hasStudentsCache || forceOfflineFlag) {
+      enrichAndSetStudents(
+        cachedStudents?.data || [],
+        cachedEnrollments?.data || [],
+        selectedYearId !== 'all' ? selectedYearId : targetYearId,
+        activeYears
+      );
+      hasHydratedCacheRef.current = true;
+      setIsOfflineData(true);
+      setLoading(false);
+    }
+    return hasStudentsCache;
+  }, [user.id, user.school_id, applyYearsAndClasses, enrichAndSetStudents, selectedYearId]);
+
   const fetchInitialData = useCallback(async () => {
     if (!user?.school_id) return;
-    setLoading(true);
+    if (studentsCountRef.current === 0 && !hasHydratedCacheRef.current) {
+      setLoading(true);
+    } else {
+      setIsRefreshingInBackground(true);
+    }
     setError(null);
     const schoolId = user.school_id;
-    const isOfflineNow = typeof navigator !== 'undefined' && !navigator.onLine;
 
-    const applyYearsAndClasses = (rawYears: any[] | null, rawClasses: any[] | null) => {
-      let finalYears = rawYears || [];
-      if (finalYears.length === 0) {
-        finalYears = [
-          { id: 'ay-2025-2026', label: '2025-2026', status: 'ACTIVE', is_active: true },
-          { id: 'ay-2024-2025', label: '2024-2025', status: 'PAST', is_active: false },
-        ];
-      }
-      const filtered = finalYears.filter((y) => y.status === 'ACTIVE' || y.status === 'FUTURE' || y.is_active);
-      const activeYears = filtered.length > 0 ? filtered : finalYears;
-      setAcademicYears(activeYears);
-
-      const locationState = location.state as { academicYearId?: string; filterYearId?: string } | null;
-      const incomingYearId = locationState?.academicYearId || locationState?.filterYearId;
-      const targetYear = incomingYearId
-        ? activeYears.find((y) => y.id === incomingYearId) ||
-          activeYears.find((y) => y.status === 'ACTIVE' || y.is_active) ||
-          activeYears[0]
-        : activeYears.find((y) => y.status === 'ACTIVE' || y.is_active) || activeYears[0];
-      if (targetYear) setSelectedYearId(targetYear.id);
-
-      const scopedClasses = (rawClasses || []).filter(
-        (c: any) => !currentCampusId || c.campus_id === currentCampusId || !c.campus_id
-      );
-      setClasses(scopedClasses);
-    };
+    if (isEffectivelyOffline()) {
+      await hydrateFromEncryptedCache(true);
+      setIsRefreshingInBackground(false);
+      setLoading(false);
+      return;
+    }
 
     try {
-      if (isOfflineNow) {
-        const [cachedYears, cachedClasses] = await Promise.all([
-          loadEncryptedRefCache<any[]>(`ref_${schoolId}_academic_years`, user.id, schoolId),
-          loadEncryptedRefCache<any[]>(`ref_${schoolId}_classes`, user.id, schoolId),
-        ]);
-        applyYearsAndClasses(cachedYears?.data || null, cachedClasses?.data || null);
-        setIsOfflineData(true);
-        return;
-      }
-
       let ayQuery = supabase.from('academic_years').select('*');
       ayQuery = ayQuery.or(`school_id.eq.${schoolId},school_id.is.null`);
-      const { data: years, error: ayErr } = await ayQuery.order('label', { ascending: false });
 
       let classQuery = supabase.from('classes').select('*');
       classQuery = classQuery.or(`school_id.eq.${schoolId},school_id.is.null`);
       if (currentCampusId) {
         classQuery = classQuery.eq('campus_id', currentCampusId);
       }
-      const { data: classData, error: clsErr } = await classQuery.order('name');
+
+      const [ayRes, clsRes] = await Promise.all([
+        withQueryTimeout(ayQuery.order('label', { ascending: false }), 6500),
+        withQueryTimeout(classQuery.order('name'), 6500),
+      ]);
+
+      const { data: years, error: ayErr } = ayRes;
+      const { data: classData, error: clsErr } = clsRes;
 
       if ((ayErr && isTransientNetworkError(ayErr)) || (clsErr && isTransientNetworkError(clsErr))) {
-        const [cachedYears, cachedClasses] = await Promise.all([
-          loadEncryptedRefCache<any[]>(`ref_${schoolId}_academic_years`, user.id, schoolId),
-          loadEncryptedRefCache<any[]>(`ref_${schoolId}_classes`, user.id, schoolId),
-        ]);
-        applyYearsAndClasses(cachedYears?.data || years || null, cachedClasses?.data || classData || null);
-        setIsOfflineData(true);
+        await hydrateFromEncryptedCache(true);
         return;
       }
 
@@ -146,124 +281,40 @@ const StudentList: React.FC<{ user: UserProfile }> = ({ user }) => {
       setIsOfflineData(false);
     } catch (err: any) {
       console.warn('Notice loading initial student list filters:', err);
-      const [cachedYears, cachedClasses] = await Promise.all([
-        loadEncryptedRefCache<any[]>(`ref_${schoolId}_academic_years`, user.id, schoolId),
-        loadEncryptedRefCache<any[]>(`ref_${schoolId}_classes`, user.id, schoolId),
-      ]);
-      applyYearsAndClasses(cachedYears?.data || null, cachedClasses?.data || null);
-      setIsOfflineData(true);
+      await hydrateFromEncryptedCache(true);
     } finally {
-      setLoading(false);
+      setIsRefreshingInBackground(false);
     }
-  }, [user.id, user.school_id, currentCampusId]);
+  }, [user.id, user.school_id, currentCampusId, hydrateFromEncryptedCache, applyYearsAndClasses, withQueryTimeout]);
 
   const fetchStudents = useCallback(async () => {
     if (!user?.school_id) return;
-    setLoading(true);
+    if (studentsCountRef.current === 0 && !hasHydratedCacheRef.current) {
+      setLoading(true);
+    } else {
+      setIsRefreshingInBackground(true);
+    }
     const schoolId = user.school_id;
-    const isOfflineNow = typeof navigator !== 'undefined' && !navigator.onLine;
     const isYearFiltered = Boolean(selectedYearId && selectedYearId !== 'all');
 
-    const enrichAndSetStudents = (rawStudents: any[], rawEnrollments: any[]) => {
-      let filteredStudents = rawStudents || [];
-      if (currentCampusId) {
-        filteredStudents = filteredStudents.filter((s: any) => !s.campus_id || s.campus_id === currentCampusId);
-      }
-
-      const enrollmentMap = new Map<string, string[]>();
-      const statusMap = new Map<string, string>();
-      const yearEnrolledIds = new Set<string>();
-
-      (rawEnrollments || []).forEach((e: any) => {
-        const list = enrollmentMap.get(e.student_id) || [];
-        list.push(e.academic_year_id);
-        enrollmentMap.set(e.student_id, list);
-        if (isYearFiltered && e.academic_year_id === selectedYearId) {
-          statusMap.set(e.student_id, e.status);
-          if (e.student_id) yearEnrolledIds.add(e.student_id);
-        }
-      });
-
-      if (isYearFiltered && (rawEnrollments || []).length > 0) {
-        filteredStudents = filteredStudents.filter((s: any) => yearEnrolledIds.has(s.id));
-      }
-
-      const currentSelectedYear = academicYears.find((y) => y.id === selectedYearId);
-      const isFutureSession = currentSelectedYear?.status === 'FUTURE';
-
-      const enrichedStudents = filteredStudents.map((s) => {
-        const history = enrollmentMap.get(s.id) || [];
-        const isReturning = isYearFiltered
-          ? history.length > 1 && history.includes(selectedYearId)
-          : history.length > 1;
-
-        let age = null;
-        let ageStatus = 'NORMAL';
-        if (s.dob) {
-          const birthDate = new Date(s.dob);
-          const refDate = new Date(new Date().getFullYear(), 8, 1);
-          age = refDate.getFullYear() - birthDate.getFullYear();
-          const m = refDate.getMonth() - birthDate.getMonth();
-          if (m < 0 || (m === 0 && refDate.getDate() < birthDate.getDate())) {
-            age--;
-          }
-          if (s.class) {
-            ageStatus = getStudentAgeStatus(age, s.class.name, s.class.level);
-          }
-        }
-
-        const targetStatus = statusMap.get(s.id) || s.status || 'ACTIVE';
-        const normalizedDocs = normalizeStudentDocuments(
-          s.submitted_documents,
-          school?.school_type,
-          school?.global_settings
-        );
-        const completeness = calculateDocumentsCompleteness(
-          normalizedDocs,
-          school?.school_type,
-          school?.global_settings
-        );
-
-        let displayEnrollmentType = isReturning ? 'Réinscrit' : 'Inscrit';
-        if (isFutureSession) {
-          displayEnrollmentType = isReturning ? 'Réinscrit (Pré-ins)' : 'Pré-inscrit';
-        }
-
-        return {
-          ...s,
-          age,
-          ageStatus,
-          enrollmentType: displayEnrollmentType,
-          enrollmentStatus: targetStatus,
-          normalizedDocs,
-          completeness,
-        };
-      });
-
-      setStudents(enrichedStudents);
-    };
+    if (isEffectivelyOffline()) {
+      await hydrateFromEncryptedCache(true);
+      setLoading(false);
+      setIsRefreshingInBackground(false);
+      return;
+    }
 
     try {
-      if (isOfflineNow) {
-        const [cachedStudents, cachedEnrollments] = await Promise.all([
-          loadEncryptedRefCache<any[]>(`ref_${schoolId}_students`, user.id, schoolId),
-          loadEncryptedRefCache<any[]>(`ref_${schoolId}_enrollments`, user.id, schoolId),
-        ]);
-        enrichAndSetStudents(cachedStudents?.data || [], cachedEnrollments?.data || []);
-        setIsOfflineData(true);
-        return;
-      }
-
       let studentIdsForYear: string[] | null = null;
 
       if (isYearFiltered) {
-        let enrollQuery = supabase
+        const enrollQuery = supabase
           .from('enrollments')
           .select('student_id, academic_year_id, status, class_id')
           .eq('academic_year_id', selectedYearId)
           .or(`school_id.eq.${schoolId},school_id.is.null`);
 
-        const { data: enrollData, error: enrollErr } = await enrollQuery;
+        const { data: enrollData, error: enrollErr } = await withQueryTimeout(enrollQuery, 6500);
         if (enrollErr && isTransientNetworkError(enrollErr)) {
           throw enrollErr;
         }
@@ -294,7 +345,7 @@ const StudentList: React.FC<{ user: UserProfile }> = ({ user }) => {
         stQuery = stQuery.in('id', studentIdsForYear);
       }
 
-      let { data: studentsData, error: studentError } = await stQuery;
+      let { data: studentsData, error: studentError } = await withQueryTimeout(stQuery, 7500);
 
       if (studentError && isTransientNetworkError(studentError)) {
         throw studentError;
@@ -304,10 +355,13 @@ const StudentList: React.FC<{ user: UserProfile }> = ({ user }) => {
         if (isYearFiltered && studentIdsForYear && studentIdsForYear.length === 0) {
           studentsData = [];
         } else {
-          const { data: fallbackStudents, error: fbErr } = await supabase
-            .from('students')
-            .select('*, class:classes(id, name, level)')
-            .order('last_name');
+          const { data: fallbackStudents, error: fbErr } = await withQueryTimeout(
+            supabase
+              .from('students')
+              .select('*, class:classes(id, name, level)')
+              .order('last_name'),
+            7500
+          );
           if (fbErr && isTransientNetworkError(fbErr)) throw fbErr;
           studentsData = fallbackStudents || [];
         }
@@ -318,7 +372,7 @@ const StudentList: React.FC<{ user: UserProfile }> = ({ user }) => {
           .from('enrollments')
           .select('student_id, academic_year_id, status, class_id')
           .or(`school_id.eq.${schoolId},school_id.is.null`);
-        const { data: allEnrollments } = await enrollQuery;
+        const { data: allEnrollments } = await withQueryTimeout(enrollQuery, 6500);
 
         if (!isYearFiltered && !currentCampusId) {
           void saveEncryptedRefCache(`ref_${schoolId}_students`, studentsData, user.id, schoolId);
@@ -335,24 +389,50 @@ const StudentList: React.FC<{ user: UserProfile }> = ({ user }) => {
       }
     } catch (err: any) {
       console.warn('Notice fetching students (fallback cache):', err);
-      const [cachedStudents, cachedEnrollments] = await Promise.all([
-        loadEncryptedRefCache<any[]>(`ref_${schoolId}_students`, user.id, schoolId),
-        loadEncryptedRefCache<any[]>(`ref_${schoolId}_enrollments`, user.id, schoolId),
-      ]);
-      enrichAndSetStudents(cachedStudents?.data || [], cachedEnrollments?.data || []);
-      setIsOfflineData(true);
+      await hydrateFromEncryptedCache(true);
     } finally {
       setLoading(false);
+      setIsRefreshingInBackground(false);
     }
-  }, [user?.id, user?.school_id, selectedYearId, currentCampusId, academicYears, school?.school_type, school?.global_settings]);
+  }, [user?.id, user?.school_id, selectedYearId, currentCampusId, hydrateFromEncryptedCache, enrichAndSetStudents, withQueryTimeout]);
 
+  const handleRetryAll = useCallback(() => {
+    clearNetworkFailureWindow();
+    void fetchInitialData();
+    void fetchStudents();
+  }, [fetchInitialData, fetchStudents]);
+
+  const handleUseOfflineCacheOnly = useCallback(async () => {
+    await hydrateFromEncryptedCache(true);
+    setLoading(false);
+    setIsRefreshingInBackground(false);
+  }, [hydrateFromEncryptedCache]);
+
+  // Cache-first instant hydration (<50ms) before network refresh
   useEffect(() => {
-    fetchInitialData();
-  }, [fetchInitialData]);
+    let active = true;
+    (async () => {
+      if (!active) return;
+      await hydrateFromEncryptedCache(isEffectivelyOffline());
+      if (active) {
+        void fetchInitialData();
+      }
+    })();
+    return () => { active = false; };
+  }, [user.school_id, currentCampusId]);
 
   useEffect(() => {
     fetchStudents();
   }, [fetchStudents]);
+
+  useEffect(() => {
+    const onGlobalRetry = (e: Event) => {
+      e.preventDefault();
+      handleRetryAll();
+    };
+    window.addEventListener('edunova_retry_active_view', onGlobalRetry);
+    return () => window.removeEventListener('edunova_retry_active_view', onGlobalRetry);
+  }, [handleRetryAll]);
 
   useEffect(() => {
     const locationState = location.state as { academicYearId?: string; filterYearId?: string } | null;
@@ -654,6 +734,12 @@ const StudentList: React.FC<{ user: UserProfile }> = ({ user }) => {
             </div>
 
             <div className="flex items-center gap-2.5 shrink-0 flex-wrap sm:flex-nowrap">
+              {isRefreshingInBackground && (
+                <span className="px-3 py-1.5 rounded-2xl text-[11px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200 flex items-center gap-1.5">
+                  <Loader2 size={12} className="animate-spin text-indigo-600" />
+                  <span>Actualisation...</span>
+                </span>
+              )}
               {isOfflineData && (
                 <span
                   className="px-3 py-1.5 rounded-2xl text-[11px] font-bold bg-amber-50 text-amber-800 border border-amber-200 flex items-center gap-1.5"
@@ -689,11 +775,11 @@ const StudentList: React.FC<{ user: UserProfile }> = ({ user }) => {
               )}
 
               <button 
-                onClick={fetchInitialData} 
+                onClick={handleRetryAll} 
                 className="p-2.5 bg-slate-50 hover:bg-blue-50 text-slate-500 hover:text-blue-600 rounded-2xl transition-colors border border-slate-200/80 shrink-0 shadow-2xs cursor-pointer" 
                 title="Rafraîchir les données"
               >
-                <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
+                <RefreshCw size={16} className={loading || isRefreshingInBackground ? 'animate-spin' : ''} />
               </button>
             </div>
           </div>
@@ -768,6 +854,8 @@ const StudentList: React.FC<{ user: UserProfile }> = ({ user }) => {
             <FluidLoadingState 
               message={`Chargement du Registre des ${terminology.students}...`} 
               subtext="Récupération fluide des dossiers académiques et inscriptions..." 
+              onRetry={handleRetryAll}
+              onUseOfflineCache={() => { void handleUseOfflineCacheOnly(); }}
             />
             <SkeletonTable rows={6} />
           </div>
@@ -785,7 +873,7 @@ const StudentList: React.FC<{ user: UserProfile }> = ({ user }) => {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {loading ? (
+              {loading && students.length === 0 ? (
                 <tr>
                   <td colSpan={5} className="py-8">
                     <SkeletonTable rows={5} />
@@ -799,7 +887,9 @@ const StudentList: React.FC<{ user: UserProfile }> = ({ user }) => {
                     </div>
                     <div>
                       <p className="text-slate-600 font-bold text-sm">
-                        {searchTerm 
+                        {isOfflineData && students.length === 0
+                          ? `Aucune donnée ${terminology.student.toLowerCase()} en cache local pour ce poste (mode hors-ligne).`
+                          : searchTerm 
                           ? `Aucun ${terminology.student.toLowerCase()} trouvé pour "${searchTerm}"`
                           : docFilter === 'INCOMPLETE'
                           ? `Aucun ${terminology.student.toLowerCase()} avec pièces manquantes trouvé`
@@ -810,19 +900,40 @@ const StudentList: React.FC<{ user: UserProfile }> = ({ user }) => {
                           : `Aucun ${terminology.student.toLowerCase()} inscrit pour la session sélectionnée.`}
                       </p>
                       <div className="flex flex-wrap items-center justify-center gap-3 mt-3">
-                        <button 
-                          onClick={() => {setSearchTerm(''); setActiveCycle('ALL'); setSelectedClassId('all'); setDocFilter('ALL'); setSelectedYearId('all');}} 
-                          className="px-3.5 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-bold rounded-xl border border-indigo-200/60 transition-all cursor-pointer shadow-2xs"
-                        >
-                          Afficher toutes les sessions
-                        </button>
-                        {(searchTerm || selectedClassId !== 'all' || docFilter !== 'ALL' || activeCycle !== 'ALL') && (
-                          <button 
-                            onClick={() => {setSearchTerm(''); setActiveCycle('ALL'); setSelectedClassId('all'); setDocFilter('ALL');}} 
-                            className="text-slate-500 hover:text-slate-700 text-xs font-bold hover:underline transition-all cursor-pointer"
-                          >
-                            Réinitialiser les filtres
-                          </button>
+                        {isOfflineData && students.length === 0 ? (
+                          <>
+                            <button
+                              type="button"
+                              onClick={handleRetryAll}
+                              className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold rounded-xl transition-all cursor-pointer"
+                            >
+                              Réessayer la synchronisation
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => navigate('/offline')}
+                              className="px-4 py-2 bg-amber-50 hover:bg-amber-100 text-amber-800 text-xs font-bold rounded-xl border border-amber-200 transition-all cursor-pointer"
+                            >
+                              Ouvrir le Coffre Hors-ligne
+                            </button>
+                          </>
+                        ) : (
+                          <>
+                            <button 
+                              onClick={() => {setSearchTerm(''); setActiveCycle('ALL'); setSelectedClassId('all'); setDocFilter('ALL'); setSelectedYearId('all');}} 
+                              className="px-3.5 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-bold rounded-xl border border-indigo-200/60 transition-all cursor-pointer shadow-2xs"
+                            >
+                              Afficher toutes les sessions
+                            </button>
+                            {(searchTerm || selectedClassId !== 'all' || docFilter !== 'ALL' || activeCycle !== 'ALL') && (
+                              <button 
+                                onClick={() => {setSearchTerm(''); setActiveCycle('ALL'); setSelectedClassId('all'); setDocFilter('ALL');}} 
+                                className="text-slate-500 hover:text-slate-700 text-xs font-bold hover:underline transition-all cursor-pointer"
+                              >
+                                Réinitialiser les filtres
+                              </button>
+                            )}
+                          </>
                         )}
                       </div>
                     </div>

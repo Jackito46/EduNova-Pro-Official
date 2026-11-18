@@ -111,10 +111,12 @@ export const hasStoredAuthToken = (): boolean => {
 // Helper to check if Supabase is reachable
 export const checkSupabaseConnection = async (): Promise<boolean> => {
   // If the browser explicitly says we are offline, don't even try to fetch
-  if (typeof window !== 'undefined' && !window.navigator.onLine) {
+  if (typeof window !== 'undefined' && window.navigator.onLine === false) {
+    emitNetworkStatus({ online: false, reason: 'navigator-offline' });
     return false;
   }
 
+  const startedAt = Date.now();
   try {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 3000); // 3s timeout
@@ -122,7 +124,7 @@ export const checkSupabaseConnection = async (): Promise<boolean> => {
     // Use the auth health endpoint with no-cors. This is extremely fast,
     // does not require any custom headers, and completely bypasses CORS preflight (OPTIONS)
     // which eliminates a whole round-trip of latency and prevents false "slow connection" triggers.
-    const response = await fetch(`${supabaseUrl}/auth/v1/health`, { 
+    await fetch(`${supabaseUrl}/auth/v1/health`, { 
       method: 'GET',
       mode: 'no-cors',
       cache: 'no-store',
@@ -130,6 +132,7 @@ export const checkSupabaseConnection = async (): Promise<boolean> => {
     });
     
     clearTimeout(timeoutId);
+    emitNetworkStatus({ online: true, latencyMs: Date.now() - startedAt });
     return true; // If fetch didn't throw, the server is reachable and we are online!
   } catch (err: any) {
     // Fallback: try the REST endpoint if auth/v1/health failed (some local setups might proxy differently)
@@ -150,8 +153,11 @@ export const checkSupabaseConnection = async (): Promise<boolean> => {
       });
       
       clearTimeout(timeoutId);
-      return response.ok || (response.status >= 400 && response.status < 500);
+      const ok = response.ok || (response.status >= 400 && response.status < 500);
+      emitNetworkStatus({ online: ok, latencyMs: Date.now() - startedAt, reason: ok ? undefined : 'health-check-failed' });
+      return ok;
     } catch (e) {
+      emitNetworkStatus({ online: false, latencyMs: Date.now() - startedAt, reason: 'health-check-failed' });
       return false;
     }
   }
@@ -379,6 +385,23 @@ if (!supabaseUrl || !supabaseUrl.startsWith('http')) {
 let lastNetworkFailureAt = 0;
 let lastSuccessEmitAt = 0;
 
+export const isEffectivelyOffline = (): boolean => {
+  if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+    return true;
+  }
+  return lastNetworkFailureAt > 0 && (Date.now() - lastNetworkFailureAt) < 15000;
+};
+
+export const clearNetworkFailureWindow = (): void => {
+  lastNetworkFailureAt = 0;
+};
+
+if (typeof window !== 'undefined') {
+  window.addEventListener('online', () => {
+    lastNetworkFailureAt = 0;
+  });
+}
+
 export const emitNetworkStatus = (detail: { online: boolean; latencyMs?: number; reason?: string }) => {
   if (typeof window === 'undefined') return;
   try {
@@ -460,8 +483,8 @@ const safeFetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<
   const method = (init?.method || 'GET').toUpperCase();
   const isIdempotent = method === 'GET' || method === 'HEAD';
   const isHeavyEndpoint = urlStr.includes('/storage/v1/') || urlStr.includes('/functions/v1/') || urlStr.includes('/rpc/');
-  const recentlyUnstable = lastNetworkFailureAt > 0 && (Date.now() - lastNetworkFailureAt) < 10000;
-  const timeoutMs = isHeavyEndpoint ? 16000 : (recentlyUnstable ? 5500 : 9000);
+  const recentlyUnstable = lastNetworkFailureAt > 0 && (Date.now() - lastNetworkFailureAt) < 15000;
+  const timeoutMs = isHeavyEndpoint ? 12000 : (recentlyUnstable ? 3500 : 7000);
   const maxRetries = isIdempotent && !recentlyUnstable ? 1 : 0;
 
   for (let attempt = 0; attempt <= maxRetries; attempt++) {

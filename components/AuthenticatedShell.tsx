@@ -22,6 +22,7 @@ import { UserProfile, UserRole } from '../types';
 import { lazyWithRetry } from '../utils/lazyWithRetry';
 import { OfflineDashboard } from './OfflineDashboard';
 import { scheduleIdleRoutePrefetch } from '../utils/routePrefetch';
+import { clearNetworkFailureWindow, isEffectivelyOffline } from '../supabase';
 
 const Dashboard = lazyWithRetry(() => import('./Dashboard'));
 const StudentForm = lazyWithRetry(() => import('./StudentForm'));
@@ -114,18 +115,39 @@ const getRouteLoadingLabel = (pathname: string): string => {
 };
 
 const RouteSuspenseFallback: React.FC<{ pathname: string; onRetry: () => void }> = ({ pathname, onRetry }) => {
-  const [isSlowWait, setIsSlowWait] = useState(() =>
-    typeof navigator !== 'undefined' ? !navigator.onLine : false
-  );
+  const [isOffline, setIsOffline] = useState<boolean>(() => isEffectivelyOffline());
+  const [isSlowWait, setIsSlowWait] = useState<boolean>(() => isEffectivelyOffline());
 
   useEffect(() => {
-    setIsSlowWait(typeof navigator !== 'undefined' ? !navigator.onLine : false);
+    const syncStatus = () => {
+      const offline = isEffectivelyOffline();
+      setIsOffline(offline);
+      if (offline) setIsSlowWait(true);
+    };
+    syncStatus();
     const timer = setTimeout(() => setIsSlowWait(true), 3000);
-    const onOffline = () => setIsSlowWait(true);
+    const onOffline = () => {
+      setIsOffline(true);
+      setIsSlowWait(true);
+    };
+    const onOnline = () => setIsOffline(false);
+    const onNetworkEvent = (e: Event) => {
+      const detail = (e as CustomEvent<{ online?: boolean }>)?.detail;
+      if (detail && typeof detail.online === 'boolean') {
+        setIsOffline(!detail.online);
+        if (!detail.online) setIsSlowWait(true);
+      } else {
+        syncStatus();
+      }
+    };
     window.addEventListener('offline', onOffline);
+    window.addEventListener('online', onOnline);
+    window.addEventListener('edunova_network_status', onNetworkEvent);
     return () => {
       clearTimeout(timer);
       window.removeEventListener('offline', onOffline);
+      window.removeEventListener('online', onOnline);
+      window.removeEventListener('edunova_network_status', onNetworkEvent);
     };
   }, [pathname]);
 
@@ -137,7 +159,6 @@ const RouteSuspenseFallback: React.FC<{ pathname: string; onRetry: () => void }>
     return <StudentDossierSkeleton title={getRouteLoadingLabel(pathname)} onRetry={onRetry} />;
   }
 
-  const isOffline = typeof navigator !== 'undefined' && !navigator.onLine;
   const subtext = isOffline
     ? 'Hors-ligne — cache local requis'
     : isSlowWait
@@ -149,24 +170,11 @@ const RouteSuspenseFallback: React.FC<{ pathname: string; onRetry: () => void }>
       <FluidLoadingState
         message={getRouteLoadingLabel(pathname)}
         subtext={subtext}
+        onRetry={() => {
+          clearNetworkFailureWindow();
+          onRetry();
+        }}
       />
-      {(isSlowWait || isOffline) && (
-        <div className="pt-2">
-          <button
-            type="button"
-            onClick={() => {
-              if (isOffline) {
-                window.location.hash = '#/offline';
-              } else {
-                onRetry();
-              }
-            }}
-            className="px-4 py-2 rounded-lg bg-slate-900 text-white text-xs font-semibold hover:bg-slate-800 transition-colors cursor-pointer whitespace-nowrap"
-          >
-            {isOffline ? 'Coffre hors-ligne' : 'Réessayer'}
-          </button>
-        </div>
-      )}
     </div>
   );
 };
@@ -181,6 +189,16 @@ const AuthenticatedRoutes: React.FC<AuthenticatedShellProps> = ({
 
   useEffect(() => {
     scheduleIdleRoutePrefetch();
+  }, []);
+
+  useEffect(() => {
+    const handleGlobalRetry = (e: Event) => {
+      if (e.defaultPrevented) return;
+      clearNetworkFailureWindow();
+      setRouteRetryNonce((n) => n + 1);
+    };
+    window.addEventListener('edunova_retry_active_view', handleGlobalRetry);
+    return () => window.removeEventListener('edunova_retry_active_view', handleGlobalRetry);
   }, []);
 
   const isPwaStandalone = useMemo(() => {

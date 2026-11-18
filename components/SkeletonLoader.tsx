@@ -1,5 +1,6 @@
 import React from 'react';
 import { motion } from 'framer-motion';
+import { clearNetworkFailureWindow, isEffectivelyOffline } from '../supabase';
 
 interface SkeletonProps {
   className?: string;
@@ -50,71 +51,183 @@ export const SkeletonCard: React.FC<{ count?: number }> = ({ count = 3 }) => (
   </div>
 );
 
-export const FluidLoadingState: React.FC<{ message?: string; subtext?: string }> = ({
-  message = "Chargement...",
-  subtext
-}) => (
-  <div className="flex flex-col items-center justify-center py-8 md:py-12 px-4 text-center w-full max-w-md mx-auto">
-    <div className="relative flex items-center justify-center mb-3.5">
-      <div className="w-11 h-11 rounded-full border-3 border-slate-100 border-t-blue-600 border-r-indigo-600 animate-spin" />
-      <div className="absolute w-6 h-6 bg-gradient-to-tr from-blue-600 to-indigo-600 rounded-full flex items-center justify-center shadow-sm">
-        <div className="w-2 h-2 bg-white rounded-full" />
-      </div>
-    </div>
-    <motion.h4
-      initial={{ opacity: 0, y: 4 }}
-      animate={{ opacity: 1, y: 0 }}
-      className="text-sm sm:text-base font-bold text-slate-900 tracking-tight leading-snug"
-    >
-      {message}
-    </motion.h4>
-    {subtext && (
-      <p className="text-xs text-slate-500 font-medium mt-1 max-w-xs leading-relaxed">
-        {subtext}
-      </p>
-    )}
-  </div>
-);
-
-const SlowNetworkEscapeBar: React.FC<{ onRetry?: () => void }> = ({ onRetry }) => {
-  const [showHelper, setShowHelper] = React.useState(() =>
-    typeof navigator !== 'undefined' ? !navigator.onLine : false
-  );
+const useSlowOrOfflineState = (slowThresholdSeconds = 3) => {
+  const [isOffline, setIsOffline] = React.useState<boolean>(() => isEffectivelyOffline());
+  const [elapsedSeconds, setElapsedSeconds] = React.useState<number>(0);
 
   React.useEffect(() => {
-    const timer = setTimeout(() => setShowHelper(true), 3000);
-    const onOffline = () => setShowHelper(true);
-    window.addEventListener('offline', onOffline);
+    const syncOffline = () => setIsOffline(isEffectivelyOffline());
+    const handleOnline = () => setIsOffline(false);
+    const handleOffline = () => setIsOffline(true);
+    const handleNetworkEvent = (e: Event) => {
+      const detail = (e as CustomEvent<{ online?: boolean }>)?.detail;
+      if (detail && typeof detail.online === 'boolean') {
+        setIsOffline(!detail.online);
+      } else {
+        syncOffline();
+      }
+    };
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    window.addEventListener('edunova_network_status', handleNetworkEvent);
+
+    const ticker = setInterval(() => {
+      setElapsedSeconds((prev) => prev + 1);
+    }, 1000);
+
     return () => {
-      clearTimeout(timer);
-      window.removeEventListener('offline', onOffline);
+      clearInterval(ticker);
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+      window.removeEventListener('edunova_network_status', handleNetworkEvent);
     };
   }, []);
 
-  if (!showHelper) return null;
-  const isOffline = typeof navigator !== 'undefined' && !navigator.onLine;
+  return {
+    isOffline,
+    elapsedSeconds,
+    isSlowWait: isOffline || elapsedSeconds >= slowThresholdSeconds,
+  };
+};
+
+const triggerViewRetry = (onRetry?: () => void) => {
+  clearNetworkFailureWindow();
+  if (onRetry) {
+    onRetry();
+  } else if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('edunova_retry_active_view', { cancelable: true }));
+  }
+};
+
+export const FluidLoadingState: React.FC<{
+  message?: string;
+  subtext?: string;
+  onRetry?: () => void;
+  onUseOfflineCache?: () => void;
+  slowThresholdSeconds?: number;
+}> = ({
+  message = "Chargement...",
+  subtext,
+  onRetry,
+  onUseOfflineCache,
+  slowThresholdSeconds = 3,
+}) => {
+  const { isOffline, elapsedSeconds, isSlowWait } = useSlowOrOfflineState(slowThresholdSeconds);
   const isAlreadyOfflineRoute = typeof window !== 'undefined' && window.location.hash.includes('/offline');
 
   return (
-    <div className="mt-3 pt-3 border-t border-slate-100 flex flex-wrap items-center justify-center gap-3 text-xs">
-      <span className="text-slate-500 font-medium">
-        {isOffline ? 'Réseau indisponible.' : 'Connexion lente détectée.'}
+    <div className="flex flex-col items-center justify-center py-8 md:py-10 px-4 text-center w-full max-w-lg mx-auto">
+      <div className="relative flex items-center justify-center mb-3.5">
+        <div
+          className={`w-11 h-11 rounded-full border-3 border-slate-100 animate-spin ${
+            isOffline
+              ? 'border-t-amber-500 border-r-rose-500'
+              : isSlowWait
+                ? 'border-t-amber-500 border-r-indigo-600'
+                : 'border-t-blue-600 border-r-indigo-600'
+          }`}
+        />
+        <div
+          className={`absolute w-6 h-6 rounded-full flex items-center justify-center shadow-sm ${
+            isOffline
+              ? 'bg-gradient-to-tr from-amber-500 to-rose-500'
+              : 'bg-gradient-to-tr from-blue-600 to-indigo-600'
+          }`}
+        >
+          <div className="w-2 h-2 bg-white rounded-full" />
+        </div>
+      </div>
+      <motion.h4
+        initial={{ opacity: 0, y: 4 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="text-sm sm:text-base font-bold text-slate-900 tracking-tight leading-snug"
+      >
+        {message}
+      </motion.h4>
+      {subtext && (
+        <p className="text-xs text-slate-500 font-medium mt-1 max-w-xs leading-relaxed">
+          {subtext}
+        </p>
+      )}
+
+      {isSlowWait && (
+        <div
+          className={`mt-4 w-full rounded-2xl border px-4 py-3 text-xs space-y-2.5 transition-all ${
+            isOffline
+              ? 'bg-rose-50/70 border-rose-200/80 text-rose-900'
+              : 'bg-amber-50/70 border-amber-200/80 text-amber-900'
+          }`}
+        >
+          <p className="font-semibold leading-relaxed">
+            {isOffline
+              ? 'Connexion réseau indisponible — bascule possible vers vos données locales.'
+              : `Connexion lente détectée (${elapsedSeconds}s) — chargement toujours actif, vous pouvez patienter ou agir :`}
+          </p>
+          <div className="flex flex-wrap items-center justify-center gap-2">
+            {onUseOfflineCache && (
+              <button
+                type="button"
+                onClick={onUseOfflineCache}
+                className="px-3.5 py-1.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold transition-colors cursor-pointer whitespace-nowrap shadow-2xs"
+              >
+                Charger le cache local
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => triggerViewRetry(onRetry)}
+              className="px-3.5 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-semibold transition-colors cursor-pointer whitespace-nowrap shadow-2xs"
+            >
+              Réessayer
+            </button>
+            {!isAlreadyOfflineRoute && (
+              <button
+                type="button"
+                onClick={() => {
+                  window.location.hash = '#/offline';
+                }}
+                className="px-3.5 py-1.5 rounded-xl bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 font-semibold transition-colors cursor-pointer whitespace-nowrap shadow-2xs"
+              >
+                Coffre Hors-ligne
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+const SlowNetworkEscapeBar: React.FC<{ onRetry?: () => void }> = ({ onRetry }) => {
+  const { isOffline, elapsedSeconds, isSlowWait } = useSlowOrOfflineState(3);
+
+  if (!isSlowWait) return null;
+  const isAlreadyOfflineRoute = typeof window !== 'undefined' && window.location.hash.includes('/offline');
+
+  return (
+    <div className="mt-3 pt-3 border-t border-slate-100 flex flex-wrap items-center justify-center gap-2.5 text-xs">
+      <span className="text-slate-600 font-medium">
+        {isOffline ? 'Réseau indisponible.' : `Connexion lente détectée (${elapsedSeconds}s).`}
       </span>
       <button
         type="button"
-        onClick={() => {
-          if (isOffline && !isAlreadyOfflineRoute) {
-            window.location.hash = '#/offline';
-          } else if (onRetry) {
-            onRetry();
-          } else {
-            window.dispatchEvent(new CustomEvent('edunova_retry_active_view'));
-          }
-        }}
-        className="px-4 py-2 rounded-lg bg-slate-900 text-white font-semibold hover:bg-slate-800 transition-colors cursor-pointer whitespace-nowrap"
+        onClick={() => triggerViewRetry(onRetry)}
+        className="px-3.5 py-1.5 rounded-lg bg-slate-900 text-white font-semibold hover:bg-slate-800 transition-colors cursor-pointer whitespace-nowrap"
       >
-        {isOffline && !isAlreadyOfflineRoute ? 'Coffre hors-ligne' : 'Réessayer'}
+        Réessayer
       </button>
+      {!isAlreadyOfflineRoute && (
+        <button
+          type="button"
+          onClick={() => {
+            window.location.hash = '#/offline';
+          }}
+          className="px-3.5 py-1.5 rounded-lg bg-slate-100 text-slate-700 font-semibold hover:bg-slate-200 transition-colors cursor-pointer whitespace-nowrap"
+        >
+          Coffre Hors-ligne
+        </button>
+      )}
     </div>
   );
 };
@@ -126,21 +239,7 @@ export const StudentDossierSkeleton: React.FC<{
   title = "Ouverture de la fiche élève...",
   onRetry
 }) => {
-  const [isSlowWait, setIsSlowWait] = React.useState(() =>
-    typeof navigator !== 'undefined' ? !navigator.onLine : false
-  );
-
-  React.useEffect(() => {
-    const timer = setTimeout(() => setIsSlowWait(true), 3000);
-    const onOffline = () => setIsSlowWait(true);
-    window.addEventListener('offline', onOffline);
-    return () => {
-      clearTimeout(timer);
-      window.removeEventListener('offline', onOffline);
-    };
-  }, []);
-
-  const isOffline = typeof navigator !== 'undefined' && !navigator.onLine;
+  const { isOffline, elapsedSeconds, isSlowWait } = useSlowOrOfflineState(3);
 
   return (
     <div className="max-w-7xl mx-auto space-y-5 animate-in fade-in duration-200 px-2 sm:px-4 lg:px-6 pb-12">
@@ -150,29 +249,34 @@ export const StudentDossierSkeleton: React.FC<{
           <div className="w-5 h-5 rounded-full border-2 border-slate-200 border-t-blue-600 animate-spin shrink-0" />
           <div className="min-w-0">
             <p className="text-sm font-bold text-slate-900 truncate">{title}</p>
-            {(isOffline || isSlowWait) && (
+            {isSlowWait && (
               <p className="text-xs text-slate-500 truncate">
-                {isOffline ? 'Hors-ligne — cache local requis' : 'Connexion lente, chargement des données...'}
+                {isOffline ? 'Hors-ligne — cache local requis' : `Connexion lente (${elapsedSeconds}s), chargement des données...`}
               </p>
             )}
           </div>
         </div>
-        {(isSlowWait || isOffline) && (
-          <button
-            type="button"
-            onClick={() => {
-              if (isOffline) {
-                window.location.hash = '#/offline';
-              } else if (onRetry) {
-                onRetry();
-              } else {
-                window.dispatchEvent(new CustomEvent('edunova_retry_active_view'));
-              }
-            }}
-            className="px-4 py-2 rounded-lg bg-slate-900 text-white text-xs font-semibold hover:bg-slate-800 transition-colors cursor-pointer whitespace-nowrap shrink-0"
-          >
-            {isOffline ? 'Coffre hors-ligne' : 'Réessayer'}
-          </button>
+        {isSlowWait && (
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              type="button"
+              onClick={() => triggerViewRetry(onRetry)}
+              className="px-3.5 py-2 rounded-lg bg-slate-900 text-white text-xs font-semibold hover:bg-slate-800 transition-colors cursor-pointer whitespace-nowrap"
+            >
+              Réessayer
+            </button>
+            {isOffline && (
+              <button
+                type="button"
+                onClick={() => {
+                  window.location.hash = '#/offline';
+                }}
+                className="px-3.5 py-2 rounded-lg bg-rose-50 text-rose-700 border border-rose-200 text-xs font-semibold hover:bg-rose-100 transition-colors cursor-pointer whitespace-nowrap"
+              >
+                Coffre hors-ligne
+              </button>
+            )}
+          </div>
         )}
       </div>
 
@@ -231,29 +335,51 @@ export const ModernRegistrySkeleton: React.FC<{
   rows = 6,
   type = 'table',
   onRetry
-}) => (
-  <div className="space-y-6 animate-in fade-in duration-300 max-w-7xl mx-auto">
-    {/* Banner Skeleton */}
-    <div className="bg-slate-900 p-5 rounded-2xl border border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-      <div className="flex items-center gap-3.5 min-w-0">
-        <div className="w-9 h-9 rounded-xl bg-indigo-500/20 border border-indigo-400/20 flex items-center justify-center shrink-0">
-          <div className="w-4 h-4 rounded-full border-2 border-indigo-300 border-t-transparent animate-spin" />
+}) => {
+  const { isOffline, elapsedSeconds, isSlowWait } = useSlowOrOfflineState(3);
+
+  return (
+    <div className="space-y-6 animate-in fade-in duration-300 max-w-7xl mx-auto">
+      {/* Banner Skeleton */}
+      <div className="bg-slate-900 p-5 rounded-2xl border border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="flex items-center gap-3.5 min-w-0">
+          <div className="w-9 h-9 rounded-xl bg-indigo-500/20 border border-indigo-400/20 flex items-center justify-center shrink-0">
+            <div className="w-4 h-4 rounded-full border-2 border-indigo-300 border-t-transparent animate-spin" />
+          </div>
+          <div className="min-w-0">
+            <p className="text-sm font-bold text-white truncate">{title}</p>
+            <p className="text-xs text-slate-400 truncate mt-0.5">
+              {isOffline
+                ? 'Hors-ligne — bascule vers le cache local ou Coffre Hors-ligne'
+                : isSlowWait
+                  ? `Connexion lente (${elapsedSeconds}s) — vous pouvez patienter ou réessayer`
+                  : subtitle || 'Récupération des données en cours...'}
+            </p>
+          </div>
         </div>
-        <div className="min-w-0">
-          <p className="text-sm font-bold text-white truncate">{title}</p>
-          {subtitle && <p className="text-xs text-slate-400 truncate mt-0.5">{subtitle}</p>}
-        </div>
+        {(onRetry || isSlowWait) && (
+          <div className="flex items-center gap-2 shrink-0 self-end sm:self-auto">
+            <button
+              type="button"
+              onClick={() => triggerViewRetry(onRetry)}
+              className="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold transition-colors cursor-pointer whitespace-nowrap"
+            >
+              Réessayer
+            </button>
+            {isOffline && (
+              <button
+                type="button"
+                onClick={() => {
+                  window.location.hash = '#/offline';
+                }}
+                className="px-3.5 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold border border-slate-700 transition-colors cursor-pointer whitespace-nowrap"
+              >
+                Coffre Hors-ligne
+              </button>
+            )}
+          </div>
+        )}
       </div>
-      {onRetry && (
-        <button
-          type="button"
-          onClick={onRetry}
-          className="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold transition-colors cursor-pointer whitespace-nowrap shrink-0 self-end sm:self-auto"
-        >
-          Réessayer
-        </button>
-      )}
-    </div>
 
     {/* Filter bar Skeleton */}
     <div className="bg-white p-4 rounded-3xl border border-slate-200/80 shadow-sm flex flex-col md:flex-row gap-4 justify-between items-center">
@@ -293,7 +419,8 @@ export const ModernRegistrySkeleton: React.FC<{
       <SkeletonCard count={rows} />
     )}
   </div>
-);
+  );
+};
 
 export const ModernDashboardSkeleton: React.FC<{
   title?: string;
