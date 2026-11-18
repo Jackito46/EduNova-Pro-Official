@@ -25,22 +25,33 @@ services:
     ports:
       # Port exposé uniquement sur la boucle locale par défaut (pgAdmin / DBeaver / scripts backup)
       - "${PG_BIND_HOST:-127.0.0.1}:${POSTGRES_PORT:-5432}:5432"
+    command:
+      [
+        "postgres",
+        "-c",
+        "config_file=/etc/postgresql/postgresql.conf",
+        "-c",
+        "log_min_messages=fatal"
+      ]
     environment:
       POSTGRES_HOST: /var/run/postgresql
+      PGPORT: 5432
       POSTGRES_PORT: 5432
+      PGDATABASE: ${POSTGRES_DB:-postgres}
       POSTGRES_DB: ${POSTGRES_DB:-postgres}
-      POSTGRES_USER: postgres
+      PGPASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD requis dans .env.local}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD requis dans .env.local}
       JWT_SECRET: ${JWT_SECRET:?JWT_SECRET requis dans .env.local}
       JWT_EXP: ${JWT_EXPIRY:-3600}
     volumes:
       - edunova_pgdata:/var/lib/postgresql/data
-      - ./deploy/local-lan/99-sync-role-passwords.sh:/docker-entrypoint-initdb.d/99-sync-role-passwords.sh:ro
+      - ./deploy/local-lan/999-edunova-role-passwords.sql:/docker-entrypoint-initdb.d/init-scripts/999-edunova-role-passwords.sql:ro
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -h localhost"]
+      test: ["CMD", "pg_isready", "-U", "postgres", "-h", "localhost"]
       interval: 5s
       timeout: 5s
-      retries: 12
+      retries: 20
+      start_period: 30s
     networks:
       - edunova_internal
 

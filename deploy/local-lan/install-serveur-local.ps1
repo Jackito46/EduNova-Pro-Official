@@ -128,7 +128,11 @@ docker compose -f docker-compose.local.yml --env-file .env.local up -d --build
 if ($LASTEXITCODE -ne 0) {
   Write-Host ""
   Write-Host "[ERREUR] La construction ou le demarrage Docker a echoue (code $LASTEXITCODE)." -ForegroundColor Red
-  Write-Host "         Consultez l'erreur ci-dessus ou lancez : docker compose -f docker-compose.local.yml logs" -ForegroundColor Yellow
+  Write-Host "         Derniers logs de edunova-db :" -ForegroundColor Yellow
+  docker logs --tail 40 edunova-db 2>&1
+  Write-Host ""
+  Write-Host "         Si edunova-db vient d'etre cree et reste bloque, reinitialisez le volume vierge :" -ForegroundColor Cyan
+  Write-Host "           docker compose -f docker-compose.local.yml down -v" -ForegroundColor White
   exit 1
 }
 
