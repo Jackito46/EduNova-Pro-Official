@@ -1,5 +1,5 @@
 # Sauvegarde PostgreSQL locale pour Serveur Windows (Docker Desktop)
-# Exécution : powershell -ExecutionPolicy Bypass -File deploy\local-lan\backup-local.ps1
+# Execution : powershell -ExecutionPolicy Bypass -File .\deploy\local-lan\backup-local.ps1
 
 param(
   [string]$BackupDir = ".\backups",
@@ -20,10 +20,10 @@ Write-Host "[EduNova Backup] Exportation de la base depuis $ContainerName..." -F
 docker exec $ContainerName pg_dumpall --clean --if-exists -U postgres | Out-File -FilePath $OutFile -Encoding utf8
 
 if (-not (Test-Path $OutFile) -or ((Get-Item $OutFile).Length -lt 100)) {
-  throw "La sauvegarde semble vide ou incomplète : $OutFile"
+  throw "La sauvegarde semble vide ou incomplete : $OutFile"
 }
 
-Write-Host "[EduNova Backup] Sauvegarde réussie : $OutFile" -ForegroundColor Green
+Write-Host "[EduNova Backup] Sauvegarde reussie : $OutFile" -ForegroundColor Green
 
 # Rotation automatique
 $Cutoff = (Get-Date).AddDays(-$RetentionDays)
