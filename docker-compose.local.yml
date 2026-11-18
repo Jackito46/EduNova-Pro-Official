@@ -1,0 +1,235 @@
+# ==============================================================================
+# EduNova Pro - Stack Locale Complète (Poste Autonome & Serveur Local LAN)
+# ==============================================================================
+# Mode 1 (Serveur Local d'Établissement / LAN multi-PC) :
+#   EDUNOVA_DEPLOYMENT_MODE=lan  (BIND_HOST=0.0.0.0 -> http://<IP_SERVEUR>:3000)
+#
+# Mode 2 (Poste Autonome / PC unique hors-ligne) :
+#   EDUNOVA_DEPLOYMENT_MODE=standalone (BIND_HOST=127.0.0.1 -> http://localhost:3000)
+#
+# Initialisation rapide des secrets :
+#   node deploy/local-lan/setup-local-env.mjs
+#   docker compose -f docker-compose.local.yml --env-file .env.local up -d --build
+# ==============================================================================
+
+name: edunova-local
+
+services:
+  # ----------------------------------------------------------------------------
+  # 1. Base de données PostgreSQL (Image officielle Supabase avec extensions)
+  # ----------------------------------------------------------------------------
+  edunova-db:
+    image: supabase/postgres:15.8.1.060
+    container_name: edunova-db
+    restart: unless-stopped
+    ports:
+      # Port exposé uniquement sur la boucle locale par défaut (pgAdmin / DBeaver / scripts backup)
+      - "${PG_BIND_HOST:-127.0.0.1}:${POSTGRES_PORT:-5432}:5432"
+    environment:
+      POSTGRES_HOST: /var/run/postgresql
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: ${POSTGRES_DB:-postgres}
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD requis dans .env.local}
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET requis dans .env.local}
+      JWT_EXP: ${JWT_EXPIRY:-3600}
+    volumes:
+      - edunova_pgdata:/var/lib/postgresql/data
+      - ./deploy/local-lan/99-sync-role-passwords.sh:/docker-entrypoint-initdb.d/99-sync-role-passwords.sh:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -h localhost"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+    networks:
+      - edunova_internal
+
+  # ----------------------------------------------------------------------------
+  # 2. Authentification GoTrue (Gestion utilisateurs, sessions, JWT locaux)
+  # ----------------------------------------------------------------------------
+  edunova-auth:
+    image: supabase/gotrue:v2.164.0
+    container_name: edunova-auth
+    restart: unless-stopped
+    depends_on:
+      edunova-db:
+        condition: service_healthy
+    environment:
+      GOTRUE_API_HOST: 0.0.0.0
+      GOTRUE_API_PORT: 9999
+      API_EXTERNAL_URL: ${API_EXTERNAL_URL:-http://localhost:3000/local-supabase}
+
+      GOTRUE_DB_DRIVER: postgres
+      GOTRUE_DB_DATABASE_URL: postgres://supabase_auth_admin:${POSTGRES_PASSWORD}@edunova-db:5432/${POSTGRES_DB:-postgres}
+
+      GOTRUE_SITE_URL: ${SITE_URL:-http://localhost:3000}
+      GOTRUE_URI_ALLOW_LIST: ${ADDITIONAL_REDIRECT_URLS:-http://localhost:3000/*,http://127.0.0.1:3000/*}
+      GOTRUE_DISABLE_SIGNUP: ${DISABLE_SIGNUP:-false}
+
+      GOTRUE_JWT_ADMIN_ROLES: service_role
+      GOTRUE_JWT_AUD: authenticated
+      GOTRUE_JWT_DEFAULT_GROUP_NAME: authenticated
+      GOTRUE_JWT_EXP: ${JWT_EXPIRY:-3600}
+      GOTRUE_JWT_SECRET: ${JWT_SECRET}
+
+      # En LAN 100% hors-ligne, autoconfirm évite le blocage sur envoi d'email SMTP externe
+      GOTRUE_EXTERNAL_EMAIL_ENABLED: "true"
+      GOTRUE_MAILER_AUTOCONFIRM: ${ENABLE_EMAIL_AUTOCONFIRM:-true}
+      GOTRUE_SMTP_ADMIN_EMAIL: ${SMTP_ADMIN_EMAIL:-admin@edunova.local}
+      GOTRUE_SMTP_HOST: ${SMTP_HOST:-}
+      GOTRUE_SMTP_PORT: ${SMTP_PORT:-587}
+      GOTRUE_SMTP_USER: ${SMTP_USER:-}
+      GOTRUE_SMTP_PASS: ${SMTP_PASS:-}
+      GOTRUE_SMTP_SENDER_NAME: ${SMTP_FROM_NAME:-EduNova Pro Local}
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1:9999/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      - edunova_internal
+
+  # ----------------------------------------------------------------------------
+  # 3. API REST PostgREST (Accès direct sécurisé RLS + RPC SQL)
+  # ----------------------------------------------------------------------------
+  edunova-rest:
+    image: postgrest/postgrest:v12.2.3
+    container_name: edunova-rest
+    restart: unless-stopped
+    depends_on:
+      edunova-db:
+        condition: service_healthy
+    environment:
+      PGRST_DB_URI: postgres://authenticator:${POSTGRES_PASSWORD}@edunova-db:5432/${POSTGRES_DB:-postgres}
+      PGRST_DB_SCHEMAS: ${PGRST_DB_SCHEMAS:-public,storage}
+      PGRST_DB_ANON_ROLE: anon
+      PGRST_JWT_SECRET: ${JWT_SECRET}
+      PGRST_DB_USE_LEGACY_GUCS: "false"
+      PGRST_APP_SETTINGS_JWT_SECRET: ${JWT_SECRET}
+      PGRST_APP_SETTINGS_JWT_EXP: ${JWT_EXPIRY:-3600}
+    networks:
+      - edunova_internal
+
+  # ----------------------------------------------------------------------------
+  # 4. Stockage Fichiers Local (Logos, photos, devoirs PDF, backups)
+  # ----------------------------------------------------------------------------
+  edunova-storage:
+    image: supabase/storage-api:v1.11.13
+    container_name: edunova-storage
+    restart: unless-stopped
+    depends_on:
+      edunova-db:
+        condition: service_healthy
+      edunova-rest:
+        condition: service_started
+    environment:
+      ANON_KEY: ${ANON_KEY:?ANON_KEY requis dans .env.local}
+      SERVICE_KEY: ${SERVICE_ROLE_KEY:?SERVICE_ROLE_KEY requis dans .env.local}
+      POSTGREST_URL: http://edunova-rest:3000
+      PGRST_JWT_SECRET: ${JWT_SECRET}
+      DATABASE_URL: postgres://supabase_storage_admin:${POSTGRES_PASSWORD}@edunova-db:5432/${POSTGRES_DB:-postgres}
+      FILE_SIZE_LIMIT: 52428800
+      STORAGE_BACKEND: file
+      FILE_STORAGE_BACKEND_PATH: /var/lib/storage
+      TENANT_ID: stub
+      REGION: stub
+      GLOBAL_S3_BUCKET: stub
+      ENABLE_IMAGE_TRANSFORMATION: "false"
+      AUTH_JWT_SECRET: ${JWT_SECRET}
+    volumes:
+      - edunova_storage:/var/lib/storage
+    networks:
+      - edunova_internal
+
+  # ----------------------------------------------------------------------------
+  # 5. Passerelle API Kong (Unifie /auth/v1, /rest/v1, /storage/v1)
+  # ----------------------------------------------------------------------------
+  edunova-kong:
+    image: kong:2.8.1
+    container_name: edunova-kong
+    restart: unless-stopped
+    depends_on:
+      edunova-auth:
+        condition: service_healthy
+      edunova-rest:
+        condition: service_started
+      edunova-storage:
+        condition: service_started
+    ports:
+      # Port Kong optionnel si accès direct sans proxy Express souhaité
+      - "${KONG_BIND_HOST:-127.0.0.1}:${KONG_HTTP_PORT:-8000}:8000"
+    environment:
+      KONG_DATABASE: "off"
+      KONG_DECLARATIVE_CONFIG: /var/lib/kong/kong.yml
+      KONG_DNS_ORDER: LAST,A,CNAME
+      KONG_PLUGINS: request-transformer,cors,key-auth,acl
+      KONG_NGINX_PROXY_PROXY_BUFFER_SIZE: 160k
+      KONG_NGINX_PROXY_PROXY_BUFFERS: 64 160k
+    volumes:
+      - ./deploy/local-lan/kong.yml:/var/lib/kong/kong.yml:ro
+    networks:
+      - edunova_internal
+
+  # ----------------------------------------------------------------------------
+  # 6. Application Full-Stack EduNova Pro + Proxy LAN (/local-supabase)
+  # ----------------------------------------------------------------------------
+  edunova-app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: edunova-app
+    restart: unless-stopped
+    depends_on:
+      edunova-kong:
+        condition: service_started
+    ports:
+      # Un seul port (3000) requis sur le réseau de l'école (0.0.0.0 en LAN, 127.0.0.1 en poste autonome)
+      - "${BIND_HOST:-0.0.0.0}:${APP_PORT:-3000}:3000"
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      EDUNOVA_DEPLOYMENT_MODE: ${EDUNOVA_DEPLOYMENT_MODE:-lan}
+      LAN_SERVER_LABEL: ${LAN_SERVER_LABEL:-Serveur Local EduNova Pro}
+      SUPABASE_LAN_PROXY: "true"
+      INTERNAL_SUPABASE_URL: http://edunova-kong:8000
+      VITE_SUPABASE_URL: ${VITE_SUPABASE_URL:-http://localhost:3000/local-supabase}
+      VITE_SUPABASE_ANON_KEY: ${ANON_KEY:?ANON_KEY requis dans .env.local}
+      SUPABASE_ANON_KEY: ${ANON_KEY}
+      SUPABASE_SERVICE_ROLE_KEY: ${SERVICE_ROLE_KEY:?SERVICE_ROLE_KEY requis dans .env.local}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY:?ENCRYPTION_KEY requis dans .env.local}
+      DEMO_REQUEST_SECRET: ${DEMO_REQUEST_SECRET:-edunova-local-demo-secret}
+      APP_URL: ${APP_URL:-http://localhost:3000}
+      VITE_APP_URL: ${APP_URL:-http://localhost:3000}
+    volumes:
+      - ./backups:/app/backups
+    networks:
+      - edunova_internal
+
+  # ----------------------------------------------------------------------------
+  # 7. Interface d'administration BD locale optionnelle (--profile admin)
+  # ----------------------------------------------------------------------------
+  edunova-pgadmin:
+    image: dpage/pgadmin4:8.13
+    container_name: edunova-pgadmin
+    profiles: ["admin"]
+    restart: unless-stopped
+    depends_on:
+      edunova-db:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:5050:80"
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL:-admin@edunova.local}
+      PGADMIN_DEFAULT_PASSWORD: ${POSTGRES_PASSWORD}
+    networks:
+      - edunova_internal
+
+volumes:
+  edunova_pgdata:
+    name: edunova_local_pgdata
+  edunova_storage:
+    name: edunova_local_storage
+
+networks:
+  edunova_internal:
+    driver: bridge

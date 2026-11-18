@@ -14,6 +14,7 @@ node_modules
 *.env
 *.env.*
 !.env.example
+!.env.local.example
 *.pem
 *.key
 *.crt
@@ -34,6 +35,8 @@ node_modules
 # Backup snapshot storage
 data/backups/*.json
 !data/backups/.gitkeep
+backups/*.sql
+backups/*.sql.gz
 
 # Build output
 dist
