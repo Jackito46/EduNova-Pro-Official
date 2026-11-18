@@ -64,6 +64,16 @@ const lanServerLabel = (process.env.LAN_SERVER_LABEL || '').trim() || (
       ? 'Serveur Local Établissement'
       : 'EduNova Cloud'
 );
+const rawLanHostname = (process.env.LAN_HOSTNAME || '')
+  .trim()
+  .toLowerCase()
+  .replace(/^https?:\/\//, '')
+  .replace(/[:/].*$/, '');
+const lanHostname: string | null =
+  deploymentMode === 'lan'
+    ? rawLanHostname ||
+      `${os.hostname().toLowerCase().replace(/[^a-z0-9-]/g, '-').replace(/^-+|-+$/g, '') || 'edunova-server'}.local`
+    : rawLanHostname || null;
 
 const publicRuntimeSupabaseUrl = (
   process.env.SUPABASE_PUBLIC_URL ||
@@ -161,6 +171,14 @@ async function startServer() {
 
     if (origin) {
       isOriginAllowed = allowedOriginPatterns.some(pattern => pattern.test(origin));
+      if (!isOriginAllowed && lanHostname) {
+        try {
+          const parsedOriginHost = new URL(origin).hostname.toLowerCase();
+          if (parsedOriginHost === lanHostname) {
+            isOriginAllowed = true;
+          }
+        } catch {}
+      }
       if (!isOriginAllowed) {
         const configuredUrl = process.env.APP_URL || process.env.RENDER_EXTERNAL_URL || process.env.VITE_APP_URL;
         if (configuredUrl) {
@@ -227,6 +245,7 @@ async function startServer() {
       deploymentMode,
       lanProxyEnabled,
       lanServerLabel,
+      lanHostname,
       supabaseUrl: lanProxyEnabled ? '/local-supabase' : publicRuntimeSupabaseUrl,
       supabaseAnonKey,
     };
@@ -537,15 +556,20 @@ async function startServer() {
       }
     }
 
+    const isLoopbackOnly = process.env.BIND_HOST === '127.0.0.1' || deploymentMode === 'standalone';
+    const lanHostnameUrl = !isLoopbackOnly && lanHostname ? `http://${lanHostname}:${activePort}` : null;
+
     res.json({
       deploymentMode,
       lanProxyActive: lanProxyEnabled,
       lanServerLabel,
+      lanHostname: !isLoopbackOnly ? lanHostname : null,
+      lanHostnameUrl,
       internalSupabaseConfigured: Boolean(internalSupabaseUrl),
       localSupabaseReachable,
       detectedLanUrls,
       loopbackUrl: `http://localhost:${activePort}`,
-      isLoopbackOnly: process.env.BIND_HOST === '127.0.0.1' || deploymentMode === 'standalone',
+      isLoopbackOnly,
       timestamp: new Date().toISOString(),
     });
   });

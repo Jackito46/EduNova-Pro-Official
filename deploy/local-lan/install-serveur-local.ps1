@@ -6,6 +6,7 @@ param(
   [ValidateSet("lan", "standalone", "")]
   [string]$Mode = "",
   [string]$LanIp = "",
+  [string]$Hostname = "",
   [string]$Label = "",
   [string]$SqlFile = "",
   [switch]$ForceEnv
@@ -20,9 +21,8 @@ Write-Host "====================================================================
 
 # 1. Verifier que Docker Engine repond
 Write-Host "[1/6] Verification de Docker Desktop Engine..." -ForegroundColor Yellow
-try {
-  docker info | Out-Null
-} catch {
+docker info | Out-Null
+if ($LASTEXITCODE -ne 0) {
   Write-Host "[ERREUR] Docker Engine ne repond pas. Verifiez que 'Engine running' (vert) apparait dans Docker Desktop." -ForegroundColor Red
   exit 1
 }
@@ -56,6 +56,11 @@ if ($Mode -eq "lan" -and -not $LanIp) {
   $LanIp = "localhost"
 }
 
+if ($Mode -eq "lan" -and -not $Hostname) {
+  $typedHost = Read-Host "Nom reseau local (.local) (Entree pour 'edunova-server' -> edunova-server.local)"
+  $Hostname = if ($typedHost.Trim()) { $typedHost.Trim() } else { "edunova-server" }
+}
+
 if (-not $Label) {
   $defaultLabel = if ($Mode -eq "standalone") { "Poste Autonome EduNova Pro" } else { "Serveur Local Etablissement" }
   $typedLabel = Read-Host "Nom du serveur affiche dans l'app (Entree = $defaultLabel)"
@@ -67,6 +72,9 @@ Write-Host "[2/6] Generation securisee de .env.local (cles JWT, Postgres, AES-25
 $envExists = Test-Path ".env.local"
 if (-not $envExists -or $ForceEnv) {
   $nodeArgs = @("deploy/local-lan/setup-local-env.mjs", "--mode=$Mode", "--ip=$LanIp", "--label=$Label")
+  if ($Hostname) {
+    $nodeArgs += "--hostname=$Hostname"
+  }
   if ($ForceEnv) {
     $nodeArgs += "--force"
   }
@@ -77,6 +85,9 @@ if (-not $envExists -or $ForceEnv) {
     Write-Host "      Node.js non detecte sur Windows : generation via Docker (node:22-alpine)..." -ForegroundColor Gray
     $workDir = (Get-Location).Path
     docker run --rm -v "${workDir}:/work" -w /work node:22-alpine node @nodeArgs
+  }
+  if ($LASTEXITCODE -ne 0) {
+    throw "Echec de la generation de .env.local."
   }
 } else {
   Write-Host "      .env.local deja present : conserve (ajoutez -ForceEnv pour regenerer)." -ForegroundColor Green
@@ -94,11 +105,18 @@ if ($Mode -eq "lan") {
     } else {
       Write-Host "      Regle pare-feu TCP 3000 deja active." -ForegroundColor Green
     }
+
+    $mdnsRule = Get-NetFirewallRule -DisplayName "EduNova Pro mDNS (.local)" -ErrorAction SilentlyContinue
+    if (-not $mdnsRule) {
+      New-NetFirewallRule -DisplayName "EduNova Pro mDNS (.local)" -Direction Inbound -Protocol UDP -LocalPort 5353 -Action Allow -Profile Private,Domain | Out-Null
+      Write-Host "      Regle pare-feu mDNS UDP 5353 creee." -ForegroundColor Green
+    }
+
     # Eviter que le serveur s'endorme sur secteur
     powercfg /change standby-timeout-ac 0 | Out-Null
     Write-Host "      Mise en veille sur secteur desactivee pour la stabilite du serveur." -ForegroundColor Green
   } else {
-    Write-Host "      [Note] Lancez PowerShell en Administrateur pour ouvrir automatiquement le port 3000 dans le pare-feu." -ForegroundColor Yellow
+    Write-Host "      [Note] Lancez PowerShell en Administrateur pour ouvrir automatiquement les ports 3000 et 5353." -ForegroundColor Yellow
   }
 } else {
   Write-Host "      Mode Poste Autonome : ecoute strictement locale (127.0.0.1:3000)." -ForegroundColor Green
@@ -107,6 +125,12 @@ if ($Mode -eq "lan") {
 # 6. Telechargement des images & construction locale
 Write-Host "[4/6] Telechargement des images Supabase + compilation EduNova Pro..." -ForegroundColor Yellow
 docker compose -f docker-compose.local.yml --env-file .env.local up -d --build
+if ($LASTEXITCODE -ne 0) {
+  Write-Host ""
+  Write-Host "[ERREUR] La construction ou le demarrage Docker a echoue (code $LASTEXITCODE)." -ForegroundColor Red
+  Write-Host "         Consultez l'erreur ci-dessus ou lancez : docker compose -f docker-compose.local.yml logs" -ForegroundColor Yellow
+  exit 1
+}
 
 # 7. Attente de disponibilite de http://localhost:3000/api/health
 Write-Host "[5/6] Verification de sante de l'application et de la base locale..." -ForegroundColor Yellow
@@ -130,16 +154,25 @@ if ($SqlFile) {
   Write-Host "[6/6] Stack prete (n'oubliez pas d'importer votre schema/backup SQL si la base est neuve)." -ForegroundColor Cyan
 }
 
+$displayHost = ""
+if ($Hostname) {
+  $cleanHost = ($Hostname.ToLower() -replace '^https?://', '' -replace '\.local$', '' -replace '[^a-z0-9-]', '-')
+  if ($cleanHost) { $displayHost = "${cleanHost}.local" }
+}
+
 Write-Host ""
 Write-Host "====================================================================" -ForegroundColor Green
 if ($ready) {
   Write-Host "  INSTALLATION REUSSIE - EduNova Pro + Supabase Local sont actifs !" -ForegroundColor Green
 } else {
-  Write-Host "  Conteneurs demarres (verifiez 'docker compose -f docker-compose.local.yml ps')" -ForegroundColor Yellow
+  Write-Host "  Conteneurs lances, attente reponse HTTP (verifiez 'docker compose -f docker-compose.local.yml ps')" -ForegroundColor Yellow
 }
 Write-Host "  Acces sur ce PC     : http://localhost:3000" -ForegroundColor White
 if ($Mode -eq "lan") {
-  Write-Host "  Acces postes LAN    : http://${LanIp}:3000" -ForegroundColor White
+  Write-Host "  Acces postes (IP)   : http://${LanIp}:3000" -ForegroundColor White
+  if ($displayHost) {
+    Write-Host "  Nom reseau (.local) : http://${displayHost}:3000 (executez set-lan-hostname.ps1 pour renommer le PC)" -ForegroundColor White
+  }
 }
 Write-Host "  Vous pouvez maintenant travailler sans connexion Internet." -ForegroundColor Gray
 Write-Host "====================================================================" -ForegroundColor Green

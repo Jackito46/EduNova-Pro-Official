@@ -76,6 +76,8 @@ interface LanStatusInfo {
   deploymentMode: 'cloud' | 'lan' | 'standalone';
   lanProxyActive: boolean;
   lanServerLabel: string;
+  lanHostname?: string | null;
+  lanHostnameUrl?: string | null;
   internalSupabaseConfigured: boolean;
   localSupabaseReachable: boolean | null;
   detectedLanUrls: string[];
@@ -807,7 +809,7 @@ export const OfflineDashboard: React.FC<OfflineDashboardProps> = ({ user }) => {
               </div>
             </div>
 
-            {lanStatus && lanStatus.detectedLanUrls.length > 0 && (
+            {lanStatus && (lanStatus.detectedLanUrls.length > 0 || lanStatus.lanHostnameUrl) && (
               <div className="space-y-1.5">
                 <div className="text-[11px] text-slate-500">
                   {lanStatus.isLoopbackOnly
@@ -815,6 +817,30 @@ export const OfflineDashboard: React.FC<OfflineDashboardProps> = ({ user }) => {
                     : 'Adresse(s) à saisir sur les autres PC / tablettes de l’école :'}
                 </div>
                 <div className="space-y-1.5">
+                  {!lanStatus.isLoopbackOnly && lanStatus.lanHostnameUrl && (
+                    <div className="flex items-center justify-between gap-2 bg-indigo-50/70 border border-indigo-200 rounded-lg px-2.5 py-1.5">
+                      <div className="min-w-0 flex items-center gap-2">
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-700 shrink-0">
+                          Nom LAN
+                        </span>
+                        <span className="font-mono text-xs font-semibold text-indigo-950 truncate">
+                          {lanStatus.lanHostnameUrl}
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleCopyLanUrl(lanStatus.lanHostnameUrl!)}
+                        className="h-7 px-2 rounded-md bg-white hover:bg-indigo-100 border border-indigo-200 text-indigo-800 text-[11px] font-semibold flex items-center gap-1 shrink-0"
+                      >
+                        {copiedUrl === lanStatus.lanHostnameUrl ? (
+                          <Check size={12} className="text-emerald-600" />
+                        ) : (
+                          <Copy size={12} />
+                        )}
+                        <span>{copiedUrl === lanStatus.lanHostnameUrl ? 'Copié' : 'Copier'}</span>
+                      </button>
+                    </div>
+                  )}
                   {(lanStatus.isLoopbackOnly ? [lanStatus.loopbackUrl] : lanStatus.detectedLanUrls).map((urlItem) => (
                     <div
                       key={urlItem}

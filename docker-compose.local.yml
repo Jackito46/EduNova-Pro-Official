@@ -190,6 +190,7 @@ services:
       PORT: 3000
       EDUNOVA_DEPLOYMENT_MODE: ${EDUNOVA_DEPLOYMENT_MODE:-lan}
       LAN_SERVER_LABEL: ${LAN_SERVER_LABEL:-Serveur Local EduNova Pro}
+      LAN_HOSTNAME: ${LAN_HOSTNAME:-}
       SUPABASE_LAN_PROXY: "true"
       INTERNAL_SUPABASE_URL: http://edunova-kong:8000
       VITE_SUPABASE_URL: ${VITE_SUPABASE_URL:-http://localhost:3000/local-supabase}

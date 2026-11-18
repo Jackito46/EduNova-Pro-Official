@@ -6,8 +6,8 @@ WORKDIR /app
 # Copie des manifestes de dépendances
 COPY package*.json ./
 
-# Installation propre des dépendances
-RUN npm ci --legacy-peer-deps
+# Installation propre des dépendances (repli npm install si le lockfile diffère)
+RUN npm ci --legacy-peer-deps || npm install --legacy-peer-deps --no-audit --no-fund
 
 # Copie du code source complet
 COPY . .

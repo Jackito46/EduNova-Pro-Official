@@ -49,13 +49,24 @@ export function detectPrimaryLanIp() {
   return null;
 }
 
+export function normalizeLanHostname(rawHostname) {
+  let clean = (rawHostname || 'edunova-server').trim().toLowerCase();
+  clean = clean.replace(/^https?:\/\//, '').replace(/[:/].*$/, '');
+  if (clean.endsWith('.local')) {
+    clean = clean.slice(0, -6);
+  }
+  clean = clean.replace(/[^a-z0-9-]/g, '-').replace(/^-+|-+$/g, '') || 'edunova-server';
+  return `${clean}.local`;
+}
+
 export function generateLocalEnvConfig(options = {}) {
   const mode = options.mode === 'standalone' ? 'standalone' : 'lan';
   const serverIp = (options.ip || (mode === 'lan' ? detectPrimaryLanIp() : null) || 'localhost').trim();
   const port = Number(options.port || 3000);
+  const lanHostname = mode === 'lan' ? normalizeLanHostname(options.hostname || 'edunova-server') : '';
   const label = (
     options.label ||
-    (mode === 'standalone' ? 'Poste Autonome EduNova Pro' : 'Serveur Local Établissement')
+    (mode === 'standalone' ? 'Poste Autonome EduNova Pro' : 'Serveur Local Etablissement')
   ).replace(/[\r\n"]/g, '');
 
   const postgresPassword = crypto.randomBytes(20).toString('hex');
@@ -89,18 +100,23 @@ export function generateLocalEnvConfig(options = {}) {
 
   const bindHost = mode === 'standalone' ? '127.0.0.1' : '0.0.0.0';
   const baseUrl = `http://${serverIp}:${port}`;
-  const redirectList =
-    mode === 'lan' && serverIp !== 'localhost'
-      ? `http://localhost:${port}/*,http://127.0.0.1:${port}/*,${baseUrl}/*`
-      : `http://localhost:${port}/*,http://127.0.0.1:${port}/*`;
+  const redirectEntries = [`http://localhost:${port}/*`, `http://127.0.0.1:${port}/*`];
+  if (mode === 'lan' && serverIp !== 'localhost') {
+    redirectEntries.push(`${baseUrl}/*`);
+  }
+  if (lanHostname) {
+    redirectEntries.push(`http://${lanHostname}:${port}/*`);
+  }
+  const redirectList = Array.from(new Set(redirectEntries)).join(',');
 
   const envContent = [
     '# ==============================================================================',
-    `# Généré automatiquement par setup-local-env.mjs le ${new Date().toISOString()}`,
-    `# Mode : ${mode === 'lan' ? 'Serveur Local Établissement (LAN)' : 'Poste Autonome (PC Unique)'}`,
+    `# Genere automatiquement par setup-local-env.mjs le ${new Date().toISOString()}`,
+    `# Mode : ${mode === 'lan' ? 'Serveur Local Etablissement (LAN)' : 'Poste Autonome (PC Unique)'}`,
     '# ==============================================================================',
     `EDUNOVA_DEPLOYMENT_MODE=${mode}`,
     `LAN_SERVER_LABEL=${label}`,
+    `LAN_HOSTNAME=${lanHostname}`,
     `BIND_HOST=${bindHost}`,
     `APP_PORT=${port}`,
     '',
@@ -134,6 +150,7 @@ export function generateLocalEnvConfig(options = {}) {
     mode,
     bindHost,
     baseUrl,
+    lanHostname,
     anonKey,
     serviceRoleKey,
     jwtSecret,
@@ -149,6 +166,7 @@ function parseArgs(argv) {
     else if (arg.startsWith('--ip=')) result.ip = arg.slice('--ip='.length);
     else if (arg.startsWith('--port=')) result.port = arg.slice('--port='.length);
     else if (arg.startsWith('--label=')) result.label = arg.slice('--label='.length);
+    else if (arg.startsWith('--hostname=')) result.hostname = arg.slice('--hostname='.length);
     else if (arg.startsWith('--out=')) result.out = arg.slice('--out='.length);
   }
   return result;

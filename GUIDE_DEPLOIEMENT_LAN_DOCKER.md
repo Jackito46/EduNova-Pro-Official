@@ -41,35 +41,47 @@ Ce script détecte automatiquement votre IP LAN, génère `.env.local` (même si
    ```bash
    docker compose -f docker-compose.local.yml --env-file .env.local up -d --build
    ```
-   Vérifiez que tous les services sont sains (`healthy` / `running`) :
-   ```bash
-   docker compose -f docker-compose.local.yml --env-file .env.local ps
-   ```
+   Vérifiez que tous les services et la base répondent :
+   - **Windows PowerShell** :
+     ```powershell
+     powershell -ExecutionPolicy Bypass -File deploy\local-lan\verify-local.ps1
+     ```
+   - **Linux / macOS** :
+     ```bash
+     docker compose -f docker-compose.local.yml --env-file .env.local ps
+     ```
 
 ---
 
 ## 2. Importation du Schéma & des Données de l'École
 
-Un conteneur PostgreSQL neuf est vide au premier démarrage. Il faut y charger le schéma EduNova (ou un export de votre instance Cloud) :
+Un conteneur PostgreSQL neuf est vide au premier démarrage. Il faut y charger votre base EduNova existante depuis Supabase Cloud (ou un fichier `.sql` local) :
 
-### Option A — Cloner une école existante depuis Supabase Cloud
-1. Exportez la base complète depuis Supabase Cloud (dans `Settings > Database > Connection string`) :
-   ```bash
-   pg_dump "postgresql://postgres:<MOT_DE_PASSE>@db.<PROJECT_REF>.supabase.co:5432/postgres" \
-     --no-owner --no-privileges -n public -n auth > backup_cloud_edunova.sql
-   ```
-2. Restaurez-la sur le serveur local :
-   - **Windows PowerShell** :
-     ```powershell
-     powershell -ExecutionPolicy Bypass -File deploy\local-lan\restore-local.ps1 -SqlFile .\backup_cloud_edunova.sql
-     ```
-   - **Linux / macOS** :
-     ```bash
-     bash deploy/local-lan/restore-local.sh ./backup_cloud_edunova.sql
-     ```
+### Option A — Cloner automatiquement votre base Online (Supabase Cloud) vers Local
+Aucun outil PostgreSQL n'est requis sur Windows (tout passe par `edunova-db`).  
+Dans le dashboard Supabase Cloud, cliquez sur **Connect** > **Session pooler** et copiez l'URI `postgresql://...`, puis lancez :
+- **Windows PowerShell** :
+  ```powershell
+  powershell -ExecutionPolicy Bypass -File deploy\local-lan\import-cloud-to-local.ps1
+  ```
+- **Linux / macOS** :
+  ```bash
+  bash deploy/local-lan/import-cloud-to-local.sh
+  ```
+*(Ce script sauvegarde votre base locale, importe tout le schéma + données `public` ainsi que les comptes `auth.users` / `auth.identities` avec les mêmes mots de passe, puis recharge PostgREST.)*
 
-### Option B — Nouvelle installation vierge
-Appliquez les scripts SQL de référence (`sql/schema.sql`, `sql/academic_and_roles.sql`, `sql/finance_final_v2.sql`, `sql/offline_first_sync_rpcs.sql`, etc.) via `restore-local.ps1` / `restore-local.sh` ou **DBeaver / pgAdmin** (`localhost:5432`).
+### Option B — Restaurer un fichier `.sql` déjà exporté
+- **Windows PowerShell** :
+  ```powershell
+  powershell -ExecutionPolicy Bypass -File deploy\local-lan\restore-local.ps1 -SqlFile .\backup_cloud_edunova.sql
+  ```
+- **Linux / macOS** :
+  ```bash
+  bash deploy/local-lan/restore-local.sh ./backup_cloud_edunova.sql
+  ```
+
+### Option C — Nouvelle installation vierge
+Appliquez les scripts SQL de référence (`sql/schema.sql`, `sql/academic_and_roles.sql`, `sql/finance_final_v2.sql`, `sql/offline_first_sync_rpcs.sql`, etc.) via `restore-local.ps1` / `restore-local.sh` ou **pgAdmin** (`docker compose -f docker-compose.local.yml --env-file .env.local --profile admin up -d` puis `http://localhost:5050`).
 
 ---
 
@@ -90,6 +102,16 @@ Appliquez les scripts SQL de référence (`sql/schema.sql`, `sql/academic_and_ro
      sudo ufw reload
      ```
 3. **Désactiver la mise en veille du PC Serveur** (Options d'alimentation : *Jamais mettre en veille*) et brancher le serveur + le switch sur un **onduleur (UPS)**.
+4. **Définir un nom réseau local facile (`http://edunova-server.local:3000`)** :
+   - **Windows (PowerShell Administrateur)** :
+     ```powershell
+     powershell -ExecutionPolicy Bypass -File deploy\local-lan\set-lan-hostname.ps1 -Hostname "edunova-server"
+     ```
+     Ce script renomme le poste Windows (`edunova-server`, max 15 caractères), met à jour `LAN_HOSTNAME=edunova-server.local` dans `.env.local`, ouvre le port mDNS (`UDP 5353`) et redémarre les conteneurs `edunova-app` / `edunova-auth`. Un redémarrage Windows peut être demandé une fois pour diffuser le nouveau nom sur tout le réseau.
+   - **Linux / Ubuntu (mDNS Avahi)** :
+     ```bash
+     sudo bash deploy/local-lan/set-lan-hostname.sh edunova-server
+     ```
 
 ---
 
@@ -97,11 +119,12 @@ Appliquez les scripts SQL de référence (`sql/schema.sql`, `sql/academic_and_ro
 
 Sur n'importe quel autre ordinateur ou tablette relié au Wi-Fi / câble de l'école :
 1. Ouvrez Google Chrome ou Microsoft Edge.
-2. Accédez directement à l'adresse affichée dans **Centre Hors-ligne & Mode Local (`/offline`)** sur le serveur, par exemple :
-   **`http://192.168.1.100:3000`**
+2. Accédez directement à l'adresse nominative **`http://edunova-server.local:3000`** (ou à l'IP affichée dans `/offline`, par ex. **`http://192.168.1.100:3000`**).
 3. Aucune configuration client manuelle n'est requise : l'application charge automatiquement `/runtime-config.js` et dialogue avec la base locale via `/local-supabase`.
 
-*(Optionnel)* Si un poste client était déjà connecté au Cloud et doit basculer vers le serveur local, ouvrez `/offline` > section **Serveur Local (LAN) & Poste Autonome** et saisissez l'adresse IP du serveur.
+*(Astuce Android / vieux PC sans mDNS)* : si un appareil ne résout pas `.local`, utilisez directement l'IP fixe (`http://192.168.1.100:3000`) ou ajoutez `<IP_SERVEUR> edunova-server.local` dans son fichier `hosts`.
+
+*(Optionnel)* Si un poste client était déjà connecté au Cloud et doit basculer vers le serveur local, ouvrez `/offline` > section **Serveur Local (LAN) & Poste Autonome** et saisissez l'adresse IP ou `http://edunova-server.local:3000`.
 
 ---
 
