@@ -122,17 +122,73 @@ if ($Mode -eq "lan") {
   Write-Host "      Mode Poste Autonome : ecoute strictement locale (127.0.0.1:3000)." -ForegroundColor Green
 }
 
-# 6. Telechargement des images & construction locale
-Write-Host "[4/6] Telechargement des images Supabase + compilation EduNova Pro..." -ForegroundColor Yellow
+# 6. Demarrer PostgreSQL d'abord et synchroniser les mots de passe des roles internes Supabase
+Write-Host "[4/6] Demarrage de PostgreSQL et synchronisation des roles Supabase..." -ForegroundColor Yellow
+$prevErrPref = $ErrorActionPreference
+$ErrorActionPreference = "Continue"
+docker compose -f docker-compose.local.yml --env-file .env.local up -d --wait edunova-db
+$dbExit = $LASTEXITCODE
+$ErrorActionPreference = $prevErrPref
+
+if ($dbExit -ne 0) {
+  Write-Host ""
+  Write-Host "[ERREUR] Le conteneur PostgreSQL (edunova-db) n'a pas pu demarrer (code $dbExit)." -ForegroundColor Red
+  $ErrorActionPreference = "Continue"
+  docker logs --tail 40 edunova-db 2>&1 | ForEach-Object { Write-Host $_ }
+  $ErrorActionPreference = $prevErrPref
+  Write-Host ""
+  Write-Host "         Pour repartir sur une base vierge :" -ForegroundColor Cyan
+  Write-Host "           docker compose -f docker-compose.local.yml --env-file .env.local down -v" -ForegroundColor White
+  exit 1
+}
+
+# Synchroniser les mots de passe meme si le volume existait deja ('Skipping initialization')
+$pgPassLine = Get-Content ".env.local" | Where-Object { $_ -match '^POSTGRES_PASSWORD=' } | Select-Object -First 1
+if ($pgPassLine) {
+  $pgPass = $pgPassLine.Substring("POSTGRES_PASSWORD=".Length).Trim()
+  if ($pgPass) {
+    $escapedPass = $pgPass.Replace("'", "''")
+    $syncSql = "SELECT format('ALTER ROLE %I WITH PASSWORD ''$escapedPass'';', rolname) FROM pg_roles WHERE rolname IN ('postgres','supabase_admin','supabase_auth_admin','authenticator','supabase_storage_admin','pgbouncer') \gexec"
+    $ErrorActionPreference = "Continue"
+    $synced = $false
+    $syncSql | docker exec -i edunova-db psql -v ON_ERROR_STOP=1 -U supabase_admin -d postgres 2>$null | Out-Null
+    if ($LASTEXITCODE -eq 0) { $synced = $true }
+    if (-not $synced) {
+      $syncSql | docker exec -i edunova-db psql -v ON_ERROR_STOP=1 -U postgres -d postgres 2>$null | Out-Null
+      if ($LASTEXITCODE -eq 0) { $synced = $true }
+    }
+    if (-not $synced) {
+      $syncSql | docker exec -i -e PGPASSWORD=postgres edunova-db psql -v ON_ERROR_STOP=1 -U postgres -d postgres 2>$null | Out-Null
+      if ($LASTEXITCODE -eq 0) { $synced = $true }
+    }
+    $ErrorActionPreference = $prevErrPref
+    if ($synced) {
+      Write-Host "      Roles Supabase synchronises avec .env.local." -ForegroundColor Green
+    } else {
+      Write-Host "      [Note] Synchronisation automatique ignoree (si erreur Auth, executez 'docker compose -f docker-compose.local.yml --env-file .env.local down -v')." -ForegroundColor Yellow
+    }
+  }
+}
+
+# 7. Telechargement des images & construction / demarrage de toute la stack
+Write-Host "[4b/6] Compilation EduNova Pro et demarrage des services Supabase..." -ForegroundColor Yellow
+$ErrorActionPreference = "Continue"
 docker compose -f docker-compose.local.yml --env-file .env.local up -d --build
-if ($LASTEXITCODE -ne 0) {
+$upExit = $LASTEXITCODE
+$ErrorActionPreference = $prevErrPref
+
+if ($upExit -ne 0) {
   Write-Host ""
-  Write-Host "[ERREUR] La construction ou le demarrage Docker a echoue (code $LASTEXITCODE)." -ForegroundColor Red
-  Write-Host "         Derniers logs de edunova-db :" -ForegroundColor Yellow
-  docker logs --tail 40 edunova-db 2>&1
+  Write-Host "[ERREUR] La construction ou le demarrage Docker a echoue (code $upExit)." -ForegroundColor Red
+  $ErrorActionPreference = "Continue"
+  Write-Host "         --- Logs edunova-auth ---" -ForegroundColor Yellow
+  docker logs --tail 25 edunova-auth 2>&1 | ForEach-Object { Write-Host $_ }
+  Write-Host "         --- Logs edunova-db ---" -ForegroundColor Yellow
+  docker logs --tail 25 edunova-db 2>&1 | ForEach-Object { Write-Host $_ }
+  $ErrorActionPreference = $prevErrPref
   Write-Host ""
-  Write-Host "         Si edunova-db vient d'etre cree et reste bloque, reinitialisez le volume vierge :" -ForegroundColor Cyan
-  Write-Host "           docker compose -f docker-compose.local.yml down -v" -ForegroundColor White
+  Write-Host "         Si le volume DB est corrompu, reinitialisez avec :" -ForegroundColor Cyan
+  Write-Host "           docker compose -f docker-compose.local.yml --env-file .env.local down -v" -ForegroundColor White
   exit 1
 }
 
