@@ -71,7 +71,7 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useSearchParams, Link } from 'react-router-dom';
-import { supabase, isNetworkOrTimeoutError, withTimeout, isBrowserStrictlyOffline } from '../supabase';
+import { supabase, isNetworkOrTimeoutError, withTimeout, isBrowserStrictlyOffline, isLocalDeploymentMode } from '../supabase';
 import { useOnlineStatus } from '../hooks/useOnlineStatus';
 import { ConnectionRetryFallback } from './ConnectionRetryFallback';
 import { FluidLoadingState } from './SkeletonLoader';
@@ -490,8 +490,9 @@ const SettingsView: React.FC<SettingsViewProps> = ({ user }) => {
       const origSizeStr = ImageOptimizationService.formatBytes(optResult.originalSizeBytes);
       const compSizeStr = ImageOptimizationService.formatBytes(optResult.compressedSizeBytes);
 
-      // 2. Upload optimisé direct vers Supabase Storage si school_id disponible
-      if (user.school_id) {
+      // 2. En Mode Serveur Local / LAN : intégrer directement le WebP compressé en base (100% hors-ligne sur tout le réseau LAN)
+      // En Mode Cloud : téléverser vers Supabase Storage si school_id disponible
+      if (user.school_id && !isLocalDeploymentMode()) {
         toast.loading(`Téléversement du logo optimisé (${compSizeStr})...`, { id: 'logo-upload' });
         const uploadRes = await LogoStorageMigrationService.uploadLogoBlob(user.school_id, optResult.blob, 'school');
         
@@ -506,14 +507,16 @@ const SettingsView: React.FC<SettingsViewProps> = ({ user }) => {
         }
       }
 
-      // 3. Fallback WebP compressé local
+      // 3. Intégration WebP compressée directe en base (Mode Local / LAN ou fallback hors-ligne)
       setSchoolData({ ...schoolData, logo_url: optResult.dataUrl });
       if (user.school_id) {
         localStorage.setItem(`school_logo_${user.school_id}`, optResult.dataUrl);
       }
       toast.success(
-        `Logo compressé localement (${origSizeStr} ➔ ${compSizeStr}, -${optResult.savingsPercent}%) ! N'oubliez pas d'enregistrer.`,
-        { id: 'logo-upload', duration: 4000 }
+        isLocalDeploymentMode()
+          ? `Logo intégré en local (${origSizeStr} ➔ ${compSizeStr}, -${optResult.savingsPercent}%) ! Cliquez sur Enregistrer pour l'appliquer à tout le réseau LAN.`
+          : `Logo compressé localement (${origSizeStr} ➔ ${compSizeStr}, -${optResult.savingsPercent}%) ! N'oubliez pas d'enregistrer.`,
+        { id: 'logo-upload', duration: 4500 }
       );
     } catch (err: any) {
       console.error("Erreur lors de l'optimisation du logo:", err);
@@ -2722,16 +2725,27 @@ const SettingsView: React.FC<SettingsViewProps> = ({ user }) => {
 
                        {/* Status Badges - completely concealing internal Supabase storage URLs */}
                        {Boolean(schoolData.logo_url && (schoolData.logo_url.includes('supabase.co') || schoolData.logo_url.includes('/storage/v1/object/') || schoolData.logo_url.includes('data_logos'))) && (
-                         <div className="flex items-center gap-1.5 text-[10.5px] text-indigo-700 font-bold bg-indigo-50/90 px-2.5 py-1 rounded-lg border border-indigo-200/70 w-fit shadow-2xs">
-                           <ShieldCheck size={13} className="text-indigo-600 shrink-0" />
-                           <span>Logo officiel actif • Hébergé sur le Cloud Sécurisé</span>
-                         </div>
+                         isLocalDeploymentMode() ? (
+                           <div className="flex items-center gap-1.5 text-[10.5px] text-amber-800 font-bold bg-amber-50/90 px-2.5 py-1 rounded-lg border border-amber-200/80 w-fit shadow-2xs">
+                             <AlertCircle size={13} className="text-amber-600 shrink-0" />
+                             <span>Logo hébergé sur le Cloud (hors-ligne) • Cliquez sur « Changer le logo » puis Enregistrer pour le stocker en local</span>
+                           </div>
+                         ) : (
+                           <div className="flex items-center gap-1.5 text-[10.5px] text-indigo-700 font-bold bg-indigo-50/90 px-2.5 py-1 rounded-lg border border-indigo-200/70 w-fit shadow-2xs">
+                             <ShieldCheck size={13} className="text-indigo-600 shrink-0" />
+                             <span>Logo officiel actif • Hébergé sur le Cloud Sécurisé</span>
+                           </div>
+                         )
                        )}
 
                        {Boolean(schoolData.logo_url && schoolData.logo_url.startsWith('data:')) && (
                          <div className="flex items-center gap-1.5 text-[10.5px] text-emerald-700 font-bold bg-emerald-50/90 px-2.5 py-1 rounded-lg border border-emerald-200/70 w-fit shadow-2xs">
                            <Check size={12} className="text-emerald-600 shrink-0" />
-                           <span>Logo importé via fichier local • Prêt à être enregistré</span>
+                           <span>
+                             {isLocalDeploymentMode()
+                               ? 'Logo intégré en base locale (100 % hors-ligne & réseau LAN)'
+                               : 'Logo importé via fichier local • Prêt à être enregistré'}
+                           </span>
                          </div>
                        )}
 

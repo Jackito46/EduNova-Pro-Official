@@ -695,7 +695,19 @@ export const ModernSaleReceiptModal: React.FC<ModernSaleReceiptModalProps> = ({
                 <div className="flex items-start justify-between border-b-2 border-slate-900 pb-3">
                   <div className="flex items-center gap-3">
                     {schoolDetails?.logo_url ? (
-                      <img src={schoolDetails.logo_url} alt="Logo" className="h-12 w-12 object-contain" referrerPolicy="no-referrer" />
+                      <img
+                        src={schoolDetails.logo_url}
+                        alt="Logo"
+                        className="h-12 w-12 object-contain"
+                        referrerPolicy="no-referrer"
+                        onError={(e) => {
+                          const img = e.currentTarget;
+                          if (!img.dataset.fallbackApplied) {
+                            img.dataset.fallbackApplied = '1';
+                            img.src = '/logo.webp';
+                          }
+                        }}
+                      />
                     ) : (
                       <div className="w-12 h-12 rounded-xl bg-slate-900 text-white flex items-center justify-center font-black text-base">
                         {schoolDetails?.name?.charAt(0) || 'E'}

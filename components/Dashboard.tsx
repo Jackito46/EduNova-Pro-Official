@@ -2057,7 +2057,12 @@ const Dashboard: React.FC<{ user: UserProfile }> = ({ user }) => {
           <div className="flex items-center gap-2.5 sm:gap-3.5 flex-1 min-w-0">
             <div className="w-10 h-10 sm:w-11 sm:h-11 bg-white rounded-2xl shadow-xs border border-slate-200/90 flex items-center justify-center overflow-hidden shrink-0">
               {schoolInfo.logo_url ? (
-                <img src={schoolInfo.logo_url} alt="Logo" className="w-full h-full object-contain p-1.5" />
+                <Logo
+                  src={schoolInfo.logo_url}
+                  alt={schoolInfo.name || 'Logo'}
+                  size="sm"
+                  className="w-full h-full rounded-2xl shadow-none ring-0 p-1"
+                />
               ) : (
                 <School size={22} className="text-slate-400" />
               )}

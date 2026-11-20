@@ -2592,7 +2592,19 @@ const StudentPaymentTracking: React.FC<{ user: UserProfile }> = ({ user }) => {
                           <div className="flex justify-between items-center mb-3 pb-2 border-b border-slate-200">
                             <div className="flex items-center gap-2.5 min-w-0">
                               {schoolDetails?.logo_url ? (
-                                <img src={schoolDetails.logo_url} alt="Logo" className="w-8 h-8 object-contain rounded-md" referrerPolicy="no-referrer" />
+                                <img
+                                  src={schoolDetails.logo_url}
+                                  alt="Logo"
+                                  className="w-8 h-8 object-contain rounded-md"
+                                  referrerPolicy="no-referrer"
+                                  onError={(e) => {
+                                    const img = e.currentTarget;
+                                    if (!img.dataset.fallbackApplied) {
+                                      img.dataset.fallbackApplied = '1';
+                                      img.src = '/logo.webp';
+                                    }
+                                  }}
+                                />
                               ) : (
                                 <div className="w-8 h-8 rounded-md bg-indigo-600 text-white font-bold flex items-center justify-center text-xs">
                                   {schoolDetails?.name?.substring(0, 1) || 'E'}

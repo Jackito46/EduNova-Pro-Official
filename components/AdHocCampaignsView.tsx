@@ -3397,7 +3397,19 @@ const AssignCampaignView: React.FC<{ user: UserProfile, campaign: Campaign, onBa
                 {/* HEADER SCOLAIRE */}
                 <div className="w-full text-center border-b-2 border-black pb-2 mb-3">
                   {school?.logo_url ? (
-                    <img src={school.logo_url} alt="Logo" className="h-12 mx-auto mb-1 object-contain" referrerPolicy="no-referrer" />
+                    <img
+                      src={school.logo_url}
+                      alt="Logo"
+                      className="h-12 mx-auto mb-1 object-contain"
+                      referrerPolicy="no-referrer"
+                      onError={(e) => {
+                        const img = e.currentTarget;
+                        if (!img.dataset.fallbackApplied) {
+                          img.dataset.fallbackApplied = '1';
+                          img.src = '/logo.webp';
+                        }
+                      }}
+                    />
                   ) : (
                     <img src="/logo.png" alt="Logo" className="h-12 mx-auto mb-1 object-contain grayscale" />
                   )}
