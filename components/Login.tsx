@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { UserRole, UserProfile } from '../types';
-import { supabase, checkSupabaseConnection, isRefreshTokenError, clearAuthStorage } from '../supabase';
+import { supabase, checkSupabaseConnection, isRefreshTokenError, clearAuthStorage, getDeploymentRuntimeInfo, isLocalDeploymentMode } from '../supabase';
 import { AuditLogger } from '../utils/auditLogger';
 import { normalizeIdentifier, containsSuspiciousPattern, validateCredentialsSanity } from '../utils/authHelpers';
-import { Wifi, WifiOff, Loader2, RefreshCw, Mail, Lock, Eye, EyeOff, ArrowRight, ShieldCheck, AlertCircle, ChevronLeft, CheckCircle2, ShieldAlert, Sparkles, Clock, X } from 'lucide-react';
+import { Wifi, WifiOff, Loader2, RefreshCw, Mail, Lock, Eye, EyeOff, ArrowRight, ShieldCheck, AlertCircle, ChevronLeft, CheckCircle2, ShieldAlert, Sparkles, Clock, X, Server } from 'lucide-react';
 import Logo from './Logo';
 import FormFooter from './FormFooter';
 import { toast } from 'sonner';
@@ -569,8 +569,8 @@ const Login: React.FC<LoginProps> = ({
         <div className="bg-white/90 backdrop-blur-2xl rounded-3xl shadow-[0_20px_60px_-15px_rgba(30,58,138,0.12),0_10px_25px_-10px_rgba(0,0,0,0.05)] overflow-hidden border border-slate-100/90 transition-all duration-500">
           <div className="p-6 sm:p-8 md:p-9">
             
-            {/* Lien retour vers la présentation vitrine EduNova Pro */}
-            {onBackToLanding && (
+            {/* Lien retour vers la présentation vitrine EduNova Pro (Cloud) ou badge Serveur Local (LAN) */}
+            {onBackToLanding ? (
               <div className="mb-4 flex items-center justify-between">
                 <button
                   type="button"
@@ -590,7 +590,15 @@ const Login: React.FC<LoginProps> = ({
                 </button>
                 <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Accès Établissement</span>
               </div>
-            )}
+            ) : isLocalDeploymentMode() ? (
+              <div className="mb-4 flex items-center justify-between gap-2 pb-3 border-b border-slate-100">
+                <div className="inline-flex items-center gap-1.5 text-[11px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200/80 px-2.5 py-1 rounded-lg min-w-0">
+                  <Server size={13} className="shrink-0 text-emerald-600" />
+                  <span className="truncate">{getDeploymentRuntimeInfo().lanServerLabel}</span>
+                </div>
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 shrink-0">Mode Local / LAN</span>
+              </div>
+            ) : null}
 
             {/* Header Section */}
             <div className="flex flex-col items-center mb-6 edunova-fade-in">

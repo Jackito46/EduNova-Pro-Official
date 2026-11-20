@@ -31,7 +31,7 @@ import {
   Loader2
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { supabase } from '../supabase';
+import { supabase, isLocalDeploymentMode } from '../supabase';
 import { UserProfile, SchoolType } from '../types';
 import { formatStudentName } from '../utils/formatters';
 import { PrintPreviewModal } from './PrintPreviewModal';
@@ -269,23 +269,25 @@ export const ParentDashboardView: React.FC<ParentDashboardViewProps> = ({
         </div>
 
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 sm:gap-2.5">
-          {/* Action 1 : Renflouer le portefeuille */}
-          <button
-            type="button"
-            onClick={() => {
-              if (parentStats.children.length > 0) {
-                onTopUpStudentWallet(parentStats.children[0]);
-              }
-            }}
-            className="group flex flex-col items-center justify-center p-3 rounded-xl sm:rounded-2xl bg-gradient-to-br from-red-50 to-rose-50/60 hover:from-red-100/80 hover:to-rose-100/80 border border-red-200/70 transition-all text-center cursor-pointer shadow-2xs active:scale-95"
-            title="Recharger le portefeuille de l'élève en ligne via MonCash / NatCash / Tranzak"
-          >
-            <div className="w-9 h-9 rounded-xl bg-red-600 text-white flex items-center justify-center shadow-xs group-hover:scale-110 transition-transform mb-1.5">
-              <Smartphone size={18} />
-            </div>
-            <span className="text-xs font-black text-slate-900 leading-tight">Renflouer Portefeuille</span>
-            <span className="text-[10px] font-bold text-red-600 mt-0.5">MonCash / Tranzak</span>
-          </button>
+          {/* Action 1 : Renflouer le portefeuille (uniquement en mode Cloud/En ligne) */}
+          {!isLocalDeploymentMode() && (
+            <button
+              type="button"
+              onClick={() => {
+                if (parentStats.children.length > 0) {
+                  onTopUpStudentWallet(parentStats.children[0]);
+                }
+              }}
+              className="group flex flex-col items-center justify-center p-3 rounded-xl sm:rounded-2xl bg-gradient-to-br from-red-50 to-rose-50/60 hover:from-red-100/80 hover:to-rose-100/80 border border-red-200/70 transition-all text-center cursor-pointer shadow-2xs active:scale-95"
+              title="Recharger le portefeuille de l'élève en ligne via MonCash / NatCash / Tranzak"
+            >
+              <div className="w-9 h-9 rounded-xl bg-red-600 text-white flex items-center justify-center shadow-xs group-hover:scale-110 transition-transform mb-1.5">
+                <Smartphone size={18} />
+              </div>
+              <span className="text-xs font-black text-slate-900 leading-tight">Renflouer Portefeuille</span>
+              <span className="text-[10px] font-bold text-red-600 mt-0.5">MonCash / Tranzak</span>
+            </button>
+          )}
 
           {/* Action 2 : Régulariser la scolarité */}
           <button
@@ -669,17 +671,19 @@ export const ParentDashboardView: React.FC<ParentDashboardViewProps> = ({
 
                   {/* Actions Principales Directes de l'Enfant */}
                   <div className="space-y-2 pt-2 border-t border-slate-100">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                      {/* Action 1 : Renflouer Portefeuille MonCash (Priorité Absolue) */}
-                      <button
-                        type="button"
-                        onClick={() => onTopUpStudentWallet(child)}
-                        className="py-2.5 px-3 bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-700 hover:to-rose-700 text-white font-bold text-xs rounded-xl shadow-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer active:scale-95"
-                        title="Recharger le portefeuille de l'élève en ligne via MonCash / Tranzak"
-                      >
-                        <Smartphone size={14} />
-                        <span>Renflouer Portefeuille</span>
-                      </button>
+                    <div className={`grid grid-cols-1 ${!isLocalDeploymentMode() ? 'sm:grid-cols-2' : ''} gap-2`}>
+                      {/* Action 1 : Renflouer Portefeuille MonCash (uniquement en mode Cloud/En ligne) */}
+                      {!isLocalDeploymentMode() && (
+                        <button
+                          type="button"
+                          onClick={() => onTopUpStudentWallet(child)}
+                          className="py-2.5 px-3 bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-700 hover:to-rose-700 text-white font-bold text-xs rounded-xl shadow-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer active:scale-95"
+                          title="Recharger le portefeuille de l'élève en ligne via MonCash / Tranzak"
+                        >
+                          <Smartphone size={14} />
+                          <span>Renflouer Portefeuille</span>
+                        </button>
+                      )}
 
                       {/* Action 2 : Relevé de Compte & Dettes */}
                       <button

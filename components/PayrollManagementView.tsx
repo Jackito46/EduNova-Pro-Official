@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { supabase } from '../supabase';
+import { supabase, isLocalDeploymentMode } from '../supabase';
 import { useSchool } from '../contexts/SchoolContext';
 import { UserProfile, StaffMember, PayrollPeriod, PayrollSlip, SalaryAdvance, UserRole } from '../types';
 import { formatStudentName } from '../utils/formatters';
@@ -624,13 +624,17 @@ const PayrollManagementView: React.FC<PayrollManagementViewProps> = ({ user }) =
 
   const canValidate = ['SUPER_ADMIN', 'SCHOOL_ADMIN', 'DIRECTOR', 'ACCOUNTANT'].includes(user.role);
 
-  // Options harmonisées pour les sélecteurs de style 'pillule'
-  const payrollPaymentMethodOptions: SelectOption[] = React.useMemo(() => [
-    { value: 'Espèces', label: 'Cash / Espèces', icon: CreditCard },
-    { value: 'Virement', label: 'Dépôt Bancaire / Virement', icon: Building2 },
-    { value: 'MonCash', label: 'MonCash (Digicel)', icon: Zap },
-    { value: 'Chèque', label: 'Chèque Bancaire', icon: Landmark },
-  ], []);
+  // Options harmonisées pour les sélecteurs de style 'pillule' (MonCash masqué en Mode Local / LAN)
+  const payrollPaymentMethodOptions: SelectOption[] = React.useMemo(() => {
+    const localMode = isLocalDeploymentMode();
+    const base: SelectOption[] = [
+      { value: 'Espèces', label: 'Cash / Espèces', icon: CreditCard },
+      { value: 'Virement', label: 'Dépôt Bancaire / Virement', icon: Building2 },
+      { value: 'MonCash', label: 'MonCash (Digicel)', icon: Zap },
+      { value: 'Chèque', label: 'Chèque Bancaire', icon: Landmark },
+    ];
+    return localMode ? base.filter(o => o.value !== 'MonCash') : base;
+  }, []);
 
   const bankOptions: SelectOption[] = React.useMemo(() => {
     if (globalSettings?.banks && Array.isArray(globalSettings.banks) && globalSettings.banks.length > 0) {

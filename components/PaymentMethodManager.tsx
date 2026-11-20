@@ -31,10 +31,11 @@ import { toast } from 'sonner';
 import {
   PaymentMethodConfig,
   getSchoolPaymentMethods,
-  DEFAULT_PAYMENT_METHODS
+  DEFAULT_PAYMENT_METHODS,
+  isPaymentMethodDisabledInLocalMode
 } from '../lib/paymentMethods';
 import { useSchool } from '../contexts/SchoolContext';
-import { supabase } from '../supabase';
+import { supabase, isLocalDeploymentMode } from '../supabase';
 
 export interface PaymentMethodManagerProps {
   schoolData: any;
@@ -117,10 +118,13 @@ export const PaymentMethodManager: React.FC<PaymentMethodManagerProps> = ({
     setTimeout(() => setCopiedText(null), 2000);
   };
 
+  const isLocalMode = isLocalDeploymentMode();
   const methods = getSchoolPaymentMethods(schoolData);
   const banks: string[] = schoolData?.global_settings?.banks || [];
 
-  const activeMethodsCount = methods.filter(m => m.enabled).length;
+  const activeMethodsCount = methods.filter(
+    m => m.enabled && !(isLocalMode && isPaymentMethodDisabledInLocalMode(m))
+  ).length;
   const customMethodsCount = methods.filter(m => m.is_custom).length;
 
   // Persistance immédiate en base de données pour synchroniser le guichet en temps réel
@@ -171,6 +175,10 @@ export const PaymentMethodManager: React.FC<PaymentMethodManagerProps> = ({
     }
     const target = methods.find(m => m.id === methodId);
     if (!target) return;
+    if (isLocalMode && isPaymentMethodDisabledInLocalMode(target)) {
+      toast.info(`${target.name} nécessite Internet (mode Cloud) et reste désactivé en Mode Local / LAN.`);
+      return;
+    }
 
     const updated = methods.map(m => {
       if (m.id === methodId) {
@@ -406,8 +414,9 @@ export const PaymentMethodManager: React.FC<PaymentMethodManagerProps> = ({
       if (!matchName && !matchDesc && !matchAcc) return false;
     }
 
-    if (methodFilter === 'active') return m.enabled;
-    if (methodFilter === 'inactive') return !m.enabled;
+    const effEnabled = m.enabled && !(isLocalMode && isPaymentMethodDisabledInLocalMode(m));
+    if (methodFilter === 'active') return effEnabled;
+    if (methodFilter === 'inactive') return !effEnabled;
     if (methodFilter === 'mobile') return m.icon_name === 'smartphone' || m.id.includes('CASH') || m.name.toLowerCase().includes('cash');
     if (methodFilter === 'bank') return m.requires_bank || m.icon_name === 'landmark';
     if (methodFilter === 'custom') return m.is_custom;
@@ -627,8 +636,23 @@ export const PaymentMethodManager: React.FC<PaymentMethodManagerProps> = ({
               </div>
             )}
 
+            {/* Banner Mode Local / LAN : modes en ligne automatiquement suspendus */}
+            {isLocalMode && (
+              <div className="px-3 py-2 bg-slate-900 border border-slate-800 rounded-lg flex items-center justify-between gap-2 text-xs text-slate-100 shadow-2xs">
+                <div className="flex items-center gap-2 min-w-0">
+                  <Lock size={13} className="text-emerald-400 shrink-0" />
+                  <p className="text-[11px] text-slate-200 leading-snug">
+                    <strong className="font-bold text-white">Mode Serveur Local / LAN actif :</strong> Les paiements en ligne (<span className="text-amber-300 font-semibold">MonCash, Natcash, Portefeuille en ligne</span>) sont automatiquement désactivés au guichet. Seuls les règlements locaux (Cash, Dépôt Bancaire, Chèque, TPE) sont proposés.
+                  </p>
+                </div>
+                <span className="px-2 py-0.5 bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 text-[9.5px] font-black rounded uppercase shrink-0">
+                  Local / LAN
+                </span>
+              </div>
+            )}
+
             {/* Banner if API gateways are disabled by Super Admin */}
-            {!schoolData?.has_api_gateways && (
+            {!isLocalMode && !schoolData?.has_api_gateways && (
               <div className="px-3 py-1.5 bg-amber-50/90 border border-amber-200/90 rounded-lg flex items-center justify-between gap-2 text-xs text-amber-900 shadow-2xs">
                 <div className="flex items-center gap-2 min-w-0">
                   <Smartphone size={13} className="text-amber-600 shrink-0" />
@@ -684,6 +708,8 @@ export const PaymentMethodManager: React.FC<PaymentMethodManagerProps> = ({
                 const isMenuOpen = openMethodMenuId === method.id;
                 const isEditing = editingMethodId === method.id;
                 const isConfiguredMoncash = method.id === 'MONCASH';
+                const isBlockedInLocal = isLocalMode && isPaymentMethodDisabledInLocalMode(method);
+                const effectivelyEnabled = method.enabled && !isBlockedInLocal;
 
                 return (
                   <div
@@ -693,7 +719,7 @@ export const PaymentMethodManager: React.FC<PaymentMethodManagerProps> = ({
                         ? 'z-40 relative shadow-md ring-1 ring-slate-300'
                         : 'z-10 relative'
                     } ${
-                      method.enabled
+                      effectivelyEnabled
                         ? 'border-slate-200/90 shadow-2xs hover:border-slate-300'
                         : 'border-slate-200 bg-slate-50/40 opacity-75'
                     }`}
@@ -702,7 +728,7 @@ export const PaymentMethodManager: React.FC<PaymentMethodManagerProps> = ({
                       {/* Top: Icon + Title + Dropdown Actions */}
                       <div className="flex items-start justify-between gap-2">
                         <div className="flex items-center gap-2 min-w-0 flex-1">
-                          {renderMethodIcon(method.icon_name, method.enabled)}
+                          {renderMethodIcon(method.icon_name, effectivelyEnabled)}
                           <div className="min-w-0 flex-1">
                             <div className="flex items-center gap-1.5 flex-wrap">
                               <h5 className="text-xs sm:text-sm font-bold text-slate-900 tracking-tight leading-snug">
@@ -713,7 +739,12 @@ export const PaymentMethodManager: React.FC<PaymentMethodManagerProps> = ({
                                   Perso
                                 </span>
                               )}
-                              {(method.id === 'MONCASH' || method.id === 'NATCASH') && (
+                              {isBlockedInLocal && (
+                                <span className="px-1.5 py-0.2 bg-slate-100 text-slate-600 font-mono text-[9px] font-bold rounded border border-slate-200 uppercase shrink-0">
+                                  Cloud Uniquement
+                                </span>
+                              )}
+                              {!isBlockedInLocal && (method.id === 'MONCASH' || method.id === 'NATCASH') && (
                                 <span className={`px-1.5 py-0.2 font-mono text-[9px] font-bold rounded border uppercase shrink-0 ${
                                   schoolData?.has_api_gateways
                                     ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
@@ -724,7 +755,7 @@ export const PaymentMethodManager: React.FC<PaymentMethodManagerProps> = ({
                               )}
                             </div>
                             <p className="text-[11px] text-slate-500 font-medium truncate mt-0.5" title={method.description}>
-                              {method.description}
+                              {isBlockedInLocal ? 'Désactivé automatiquement en Mode Serveur Local / LAN.' : method.description}
                             </p>
                           </div>
                         </div>
@@ -735,15 +766,24 @@ export const PaymentMethodManager: React.FC<PaymentMethodManagerProps> = ({
                             <button
                               type="button"
                               onClick={() => toggleMethodActive(method.id)}
-                              className={`px-2 py-0.5 rounded-full text-[10.5px] font-bold flex items-center gap-1 transition-all cursor-pointer border ${
-                                method.enabled
-                                  ? 'bg-emerald-50 text-emerald-700 border-emerald-200/80 hover:bg-rose-50 hover:text-rose-700 hover:border-rose-200'
-                                  : 'bg-slate-100 text-slate-500 border-slate-200 hover:bg-emerald-50 hover:text-emerald-700 hover:border-emerald-200'
+                              disabled={isBlockedInLocal}
+                              className={`px-2 py-0.5 rounded-full text-[10.5px] font-bold flex items-center gap-1 transition-all border ${
+                                isBlockedInLocal
+                                  ? 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed'
+                                  : effectivelyEnabled
+                                  ? 'bg-emerald-50 text-emerald-700 border-emerald-200/80 hover:bg-rose-50 hover:text-rose-700 hover:border-rose-200 cursor-pointer'
+                                  : 'bg-slate-100 text-slate-500 border-slate-200 hover:bg-emerald-50 hover:text-emerald-700 hover:border-emerald-200 cursor-pointer'
                               }`}
-                              title={method.enabled ? "Actif au Guichet (Cliquer pour désactiver)" : "Inactif au Guichet (Cliquer pour activer)"}
+                              title={
+                                isBlockedInLocal
+                                  ? "Indisponible en Mode Local / LAN (requiert Internet / Cloud)"
+                                  : effectivelyEnabled
+                                  ? "Actif au Guichet (Cliquer pour désactiver)"
+                                  : "Inactif au Guichet (Cliquer pour activer)"
+                              }
                             >
-                              <span className={`w-1.5 h-1.5 rounded-full ${method.enabled ? 'bg-emerald-500' : 'bg-slate-400'}`} />
-                              <span>{method.enabled ? 'Actif' : 'Inactif'}</span>
+                              <span className={`w-1.5 h-1.5 rounded-full ${isBlockedInLocal ? 'bg-slate-300' : effectivelyEnabled ? 'bg-emerald-500' : 'bg-slate-400'}`} />
+                              <span>{isBlockedInLocal ? 'Hors local' : effectivelyEnabled ? 'Actif' : 'Inactif'}</span>
                             </button>
                           )}
 

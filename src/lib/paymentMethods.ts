@@ -1,3 +1,5 @@
+import { isLocalDeploymentMode } from '../../supabase';
+
 export interface PaymentMethodConfig {
   id: string;
   code: string;
@@ -12,6 +14,44 @@ export interface PaymentMethodConfig {
   instructions?: string;
   icon_name: 'banknote' | 'landmark' | 'smartphone' | 'receipt' | 'credit-card' | 'wallet' | 'dollar-sign';
   is_custom?: boolean;
+}
+
+/**
+ * Modes de paiement strictement dépendants d'Internet / passerelles en ligne,
+ * automatiquement désactivés en Mode Serveur Local / LAN / Hors-ligne.
+ */
+export const LOCAL_MODE_DISABLED_PAYMENT_IDS = new Set([
+  'MONCASH',
+  'NATCASH',
+  'PORTEFEUILLE',
+]);
+
+export const LOCAL_MODE_DISABLED_PAYMENT_CODES = new Set([
+  'moncash',
+  'natcash',
+  'portefeuille',
+  'tranzak',
+  'kobara',
+]);
+
+export function isPaymentMethodDisabledInLocalMode(
+  methodOrCode: string | Pick<PaymentMethodConfig, 'id' | 'code'> | null | undefined
+): boolean {
+  if (!methodOrCode) return false;
+  if (typeof methodOrCode === 'string') {
+    const trimmed = methodOrCode.trim();
+    if (!trimmed) return false;
+    return (
+      LOCAL_MODE_DISABLED_PAYMENT_IDS.has(trimmed.toUpperCase()) ||
+      LOCAL_MODE_DISABLED_PAYMENT_CODES.has(trimmed.toLowerCase())
+    );
+  }
+  const idUpper = (methodOrCode.id || '').trim().toUpperCase();
+  const codeLower = (methodOrCode.code || '').trim().toLowerCase();
+  return (
+    LOCAL_MODE_DISABLED_PAYMENT_IDS.has(idUpper) ||
+    LOCAL_MODE_DISABLED_PAYMENT_CODES.has(codeLower)
+  );
 }
 
 export const DEFAULT_PAYMENT_METHODS: PaymentMethodConfig[] = [
@@ -140,20 +180,28 @@ export function getSchoolPaymentMethods(school: any): PaymentMethodConfig[] {
 
 /**
  * Recupere uniquement les méthodes de paiement ACTIVÉES par l'administration.
+ * En Mode Local / LAN, les méthodes dépendantes d'Internet (MonCash, Natcash, Portefeuille en ligne)
+ * sont automatiquement filtrées pour ne conserver que les encaissements locaux au guichet.
  */
 export function getActiveSchoolPaymentMethods(school: any): PaymentMethodConfig[] {
   const allMethods = getSchoolPaymentMethods(school);
+  const localMode = isLocalDeploymentMode();
   const activeGateway = school?.global_settings?.active_mobile_money_gateway;
-  
+
   const active = allMethods.filter(m => {
-    if (m.enabled) return true;
-    // Si la passerelle Tranzak ou Kobara est active, rendre MonCash disponible au guichet
-    if ((m.code === 'MonCash' || m.id === 'MONCASH') && (activeGateway === 'tranzak' || activeGateway === 'kobara')) {
-      return true;
+    if (localMode && isPaymentMethodDisabledInLocalMode(m)) {
+      return false;
     }
-    // Si Tranzak est actif, Natcash est également supporté
-    if ((m.code === 'Natcash' || m.id === 'NATCASH') && activeGateway === 'tranzak') {
-      return true;
+    if (m.enabled) return true;
+    if (!localMode) {
+      // Si la passerelle Tranzak ou Kobara est active (Cloud), rendre MonCash disponible au guichet
+      if ((m.code === 'MonCash' || m.id === 'MONCASH') && (activeGateway === 'tranzak' || activeGateway === 'kobara')) {
+        return true;
+      }
+      // Si Tranzak est actif (Cloud), Natcash est également supporté
+      if ((m.code === 'Natcash' || m.id === 'NATCASH') && activeGateway === 'tranzak') {
+        return true;
+      }
     }
     return false;
   });
@@ -185,6 +233,9 @@ export function getPaymentMethodConfig(codeOrId: string, school: any): PaymentMe
  */
 export function isPaymentMethodActive(codeOrId: string, school: any): boolean {
   if (!codeOrId) return false;
+  if (isLocalDeploymentMode() && isPaymentMethodDisabledInLocalMode(codeOrId)) {
+    return false;
+  }
   const config = getPaymentMethodConfig(codeOrId, school);
   return Boolean(config && config.enabled);
 }
@@ -208,6 +259,9 @@ export function isMonCashPaymentActive(school: any): boolean {
  * Respecte les modes de règlement et passerelles actives de l'établissement (Multi-Tenant).
  */
 export function getAllowedWalletOperators(school: any): ('moncash' | 'natcash')[] {
+  if (isLocalDeploymentMode()) {
+    return [];
+  }
   const activeGateway = school?.global_settings?.active_mobile_money_gateway || 'tranzak';
   const operators: ('moncash' | 'natcash')[] = [];
 

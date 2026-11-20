@@ -41,7 +41,7 @@ import { TranzakGatewaySettings } from './TranzakGatewaySettings';
 import { ApiConfigAuditView } from './ApiConfigAuditView';
 import { MobilePaymentRouterService, MobileMoneyGateway } from '../services/mobilePaymentRouterService';
 import { toast } from 'sonner';
-import { supabase } from '../supabase';
+import { supabase, isLocalDeploymentMode } from '../supabase';
 import { useSchool } from '../contexts/SchoolContext';
 
 interface ApiCredentialsVaultProps {
@@ -616,7 +616,19 @@ export const ApiCredentialsVault: React.FC<ApiCredentialsVaultProps> = ({
           )}
         </div>
 
-        {!isGatewaysEnabledForSchool && (
+        {isLocalDeploymentMode() && (
+          <div className="p-2.5 rounded-lg bg-emerald-500/10 border border-emerald-500/30 flex items-start gap-2 text-emerald-100 text-xs">
+            <Server size={15} className="text-emerald-400 shrink-0 mt-0.5" />
+            <div>
+              <p className="font-bold text-emerald-300">Mode Serveur Local / LAN : Passerelles en ligne suspendues</p>
+              <p className="text-[11px] text-emerald-100/85 mt-0.5">
+                Les passerelles Mobile Money en ligne (Tranzak, Kobara, MonCash, NatCash) et le Portefeuille en ligne sont automatiquement désactivés en fonctionnement local. Vos réglages Cloud restent conservés sans modification.
+              </p>
+            </div>
+          </div>
+        )}
+
+        {!isLocalDeploymentMode() && !isGatewaysEnabledForSchool && (
           <div className="p-2.5 rounded-lg bg-amber-500/10 border border-amber-500/30 flex items-start gap-2 text-amber-200 text-xs">
             <Lock size={15} className="text-amber-400 shrink-0 mt-0.5" />
             <div>

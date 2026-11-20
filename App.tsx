@@ -3,7 +3,7 @@ import { HashRouter } from 'react-router-dom';
 import { ShieldAlert, RefreshCw, Clock } from 'lucide-react';
 import { Toaster, toast } from 'sonner';
 import { UserProfile, UserRole } from './types';
-import { supabase, clearAuthStorage, isRefreshTokenError, hasStoredAuthToken, purgeSelectiveSessionStorage, isUiPreferenceStorageKey } from './supabase';
+import { supabase, clearAuthStorage, isRefreshTokenError, hasStoredAuthToken, purgeSelectiveSessionStorage, isUiPreferenceStorageKey, isLocalDeploymentMode } from './supabase';
 import { AuditLogger } from './utils/auditLogger';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { useSecurity } from './components/SecurityGuard';
@@ -27,6 +27,10 @@ const AuthenticatedShell = lazyWithRetry(loadAuthenticatedShell);
 type PublicView = 'landing' | 'login';
 
 const parsePublicViewFromHash = (hash?: string): PublicView => {
+  // En Mode Serveur Local / LAN, ignorer la page vitrine marketing et ouvrir directement la connexion
+  if (isLocalDeploymentMode()) {
+    return 'login';
+  }
   const h = typeof hash === 'string'
     ? hash
     : (typeof window !== 'undefined' ? window.location.hash || '' : '');
@@ -176,8 +180,11 @@ const App: React.FC = () => {
     try { window.localStorage.setItem('edunova_session_timeout', sessionTimeoutMinutes.toString()); } catch(e){}
   }, [sessionTimeoutMinutes]);
 
+  const isLocalMode = isLocalDeploymentMode();
+
   // Explicit state management between public landing page and member login screen
   const [publicView, setPublicView] = useState<PublicView>(() => {
+    if (isLocalMode) return 'login';
     try {
       const forced = typeof window !== 'undefined' ? (window as any).__edunovaForcedPublicView : null;
       if (forced === 'login' || forced === 'landing') return forced;
@@ -190,13 +197,14 @@ const App: React.FC = () => {
   const suppressHashSyncRef = useRef(false);
 
   const switchPublicView = useCallback((target: PublicView, options?: { skipScrollReset?: boolean }) => {
-    if (target === 'login') {
+    const effectiveTarget: PublicView = isLocalDeploymentMode() ? 'login' : target;
+    if (effectiveTarget === 'login') {
       void safePreloadModule(loadLogin);
     } else {
       void safePreloadModule(loadPublicLandingPage);
     }
 
-    const targetHash = target === 'login' ? '#/login' : '#/';
+    const targetHash = effectiveTarget === 'login' ? '#/login' : '#/';
     if (typeof window !== 'undefined') {
       if (window.location.hash !== targetHash) {
         suppressHashSyncRef.current = true;
@@ -210,9 +218,9 @@ const App: React.FC = () => {
       }
     }
 
-    setPendingPublicView(target);
+    setPendingPublicView(effectiveTarget);
     startTransition(() => {
-      setPublicView(target);
+      setPublicView(effectiveTarget);
     });
   }, []);
 
@@ -226,6 +234,15 @@ const App: React.FC = () => {
     const syncHashToView = () => {
       if (suppressHashSyncRef.current) return;
       try {
+        if (isLocalDeploymentMode()) {
+          if (!user) {
+            void safePreloadModule(loadLogin);
+            startTransition(() => {
+              setPublicView('login');
+            });
+          }
+          return;
+        }
         const h = window.location.hash || '';
         const parsed = parsePublicViewFromHash(h);
         if (parsed === 'login') {
@@ -1208,11 +1225,12 @@ const App: React.FC = () => {
   }
 
   if (!user) {
+    const effectivePublicView: PublicView = isLocalMode ? 'login' : publicView;
     return (
       <ErrorBoundary>
         <Toaster position="top-center" richColors closeButton expand={false} />
-        <React.Suspense fallback={<PublicRouteFallback target={publicView} />}>
-          {publicView === 'landing' ? (
+        <React.Suspense fallback={<PublicRouteFallback target={effectivePublicView} />}>
+          {!isLocalMode && effectivePublicView === 'landing' ? (
             <div key="public-landing" className="edunova-fade-in">
               <PublicLandingPage
                 onOpenLogin={() => switchPublicView('login')}
@@ -1241,10 +1259,10 @@ const App: React.FC = () => {
                     });
                   }}
                   onReset={purgeSystemState}
-                  onBackToLanding={() => switchPublicView('landing')}
-                  onPreloadLanding={() => { void safePreloadModule(loadPublicLandingPage); }}
+                  onBackToLanding={isLocalMode ? undefined : () => switchPublicView('landing')}
+                  onPreloadLanding={isLocalMode ? undefined : () => { void safePreloadModule(loadPublicLandingPage); }}
                   onLoginStart={() => { void safePreloadModule(loadAuthenticatedShell); }}
-                  isReturningToLanding={pendingPublicView === 'landing'}
+                  isReturningToLanding={!isLocalMode && pendingPublicView === 'landing'}
                 />
               </HashRouter>
             </div>

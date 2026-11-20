@@ -4257,6 +4257,7 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
                 </div>
 
                 {/* CHAMP OFFICIEL : SOLDE ACTUEL DU PORTEFEUILLE DE L'ÉLÈVE */}
+                {isWalletPaymentActive(schoolDetails || school) && (
                 <div className="space-y-1 min-w-0 animate-in fade-in duration-200">
                   <div className="flex items-center justify-between">
                     <label className="text-[11px] sm:text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5" title="Solde actuel du portefeuille élève">
@@ -4329,6 +4330,7 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
                     </div>
                   </div>
                 </div>
+                )}
 
                 {/* Information claire pour les paiements mobiles */}
                 {(paymentMethod === 'MonCash' || paymentMethod === 'Natcash') && (

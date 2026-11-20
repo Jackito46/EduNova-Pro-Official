@@ -90,18 +90,27 @@ export interface DeploymentRuntimeInfo {
 }
 
 export function getDeploymentRuntimeInfo(): DeploymentRuntimeInfo {
+  const runtimeCfg: EduNovaRuntimeConfig =
+    typeof window !== 'undefined' && (window as any).__EDUNOVA_RUNTIME__
+      ? (window as any).__EDUNOVA_RUNTIME__
+      : RUNTIME_CONFIG;
   const override = readStoredLanOverride();
-  const baseMode: DeploymentMode = RUNTIME_CONFIG.deploymentMode || (RUNTIME_CONFIG.lanProxyEnabled ? 'lan' : 'cloud');
+  const baseMode: DeploymentMode = runtimeCfg.deploymentMode || (runtimeCfg.lanProxyEnabled ? 'lan' : 'cloud');
   return {
     mode: override.enabled ? 'lan' : baseMode,
-    lanProxyActive: Boolean(RUNTIME_CONFIG.lanProxyEnabled),
-    lanServerLabel: RUNTIME_CONFIG.lanServerLabel || (baseMode === 'cloud' ? 'EduNova Cloud' : 'Serveur Local Établissement'),
+    lanProxyActive: Boolean(runtimeCfg.lanProxyEnabled),
+    lanServerLabel: runtimeCfg.lanServerLabel || (baseMode === 'cloud' ? 'EduNova Cloud' : 'Serveur Local Établissement'),
     activeSupabaseUrl: supabaseUrl,
     defaultSupabaseUrl: runtimeDefaultUrl || DEFAULT_CLOUD_FALLBACK_URL,
     hasCustomOverride: override.enabled,
     customServerUrl: override.url,
     customAnonKeyConfigured: Boolean(override.anonKey),
   };
+}
+
+export function isLocalDeploymentMode(): boolean {
+  const info = getDeploymentRuntimeInfo();
+  return info.mode === 'lan' || info.mode === 'standalone' || info.lanProxyActive;
 }
 
 export function setLocalBackendOverride(options: { enabled: boolean; url?: string; anonKey?: string }): void {
