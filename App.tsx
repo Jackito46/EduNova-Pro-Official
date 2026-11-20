@@ -3,7 +3,7 @@ import { HashRouter } from 'react-router-dom';
 import { ShieldAlert, RefreshCw, Clock } from 'lucide-react';
 import { Toaster, toast } from 'sonner';
 import { UserProfile, UserRole } from './types';
-import { supabase, clearAuthStorage, isRefreshTokenError, hasStoredAuthToken, purgeSelectiveSessionStorage, isUiPreferenceStorageKey, isLocalDeploymentMode } from './supabase';
+import { supabase, clearAuthStorage, isRefreshTokenError, hasStoredAuthToken, purgeSelectiveSessionStorage, isUiPreferenceStorageKey, isLocalDeploymentMode, isBrowserStrictlyOffline } from './supabase';
 import { AuditLogger } from './utils/auditLogger';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { useSecurity } from './components/SecurityGuard';
@@ -297,7 +297,7 @@ const App: React.FC = () => {
   const syncProfile = useCallback(async (userId: string, isRecovery: boolean = false) => {
     console.log("App.tsx: Starting syncProfile for user", userId, { isRecovery });
     
-    if (!navigator.onLine) {
+    if (isBrowserStrictlyOffline()) {
       console.warn("App.tsx: Browser is offline, skipping syncProfile and using cache.");
       setLoading(false);
       return;
@@ -528,7 +528,7 @@ const App: React.FC = () => {
   useEffect(() => {
     if (!user?.id) return;
     void ensureOfflineVaultUnlocked(user.id, user.school_id || 'global').then((unlocked) => {
-      if (unlocked && user.school_id && typeof navigator !== 'undefined' && navigator.onLine) {
+      if (unlocked && user.school_id && !isBrowserStrictlyOffline()) {
         void prefetchSchoolReferenceCache(user.school_id, user.id);
       }
     });
@@ -587,7 +587,7 @@ const App: React.FC = () => {
         } catch (e) {}
       }
 
-      if (!navigator.onLine) {
+      if (isBrowserStrictlyOffline()) {
         console.warn("App.tsx: Browser is offline, using cached session.");
         if (mounted) setLoading(false);
         return;
@@ -997,7 +997,7 @@ const App: React.FC = () => {
 
     const checkSessionState = async (force: boolean = false) => {
       if (maintenanceMode && userRole !== 'SUPER_ADMIN') return;
-      if (typeof navigator !== 'undefined' && !navigator.onLine) return;
+      if (isBrowserStrictlyOffline()) return;
       const isLoginInProgress = window.sessionStorage.getItem('edunova_login_in_progress') === 'true';
       if (isLoginInProgress) return;
       const nowCheck = Date.now();
@@ -1287,7 +1287,7 @@ const App: React.FC = () => {
         currentStage={loadingStage}
         cachedUserName={cachedProfile?.full_name || cachedProfile?.email}
         cachedUserRole={cachedProfile?.role}
-        isOffline={!navigator.onLine}
+        isOffline={isBrowserStrictlyOffline()}
         onContinueOffline={() => {
           if (cachedProfile) {
             setUser(cachedProfile);

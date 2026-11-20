@@ -71,7 +71,7 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useSearchParams, Link } from 'react-router-dom';
-import { supabase, isNetworkOrTimeoutError, withTimeout } from '../supabase';
+import { supabase, isNetworkOrTimeoutError, withTimeout, isBrowserStrictlyOffline } from '../supabase';
 import { useOnlineStatus } from '../hooks/useOnlineStatus';
 import { ConnectionRetryFallback } from './ConnectionRetryFallback';
 import { FluidLoadingState } from './SkeletonLoader';
@@ -670,8 +670,8 @@ const SettingsView: React.FC<SettingsViewProps> = ({ user }) => {
       }
     } catch (e) {}
 
-    // 2. Court-circuit immédiat hors-ligne (0ms, aucun freeze)
-    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+    // 2. Court-circuit immédiat hors-ligne (Cloud sans Internet)
+    if (isBrowserStrictlyOffline()) {
       if (hasHydratedLocal) {
         setUsingLocalCache({ active: true, timestamp: cachedTs });
         setFetchError(null);
@@ -868,7 +868,7 @@ const SettingsView: React.FC<SettingsViewProps> = ({ user }) => {
         }
       }
     } catch (err: any) {
-      const networkIssue = isNetworkOrTimeoutError(err) || (typeof navigator !== 'undefined' && !navigator.onLine);
+      const networkIssue = isNetworkOrTimeoutError(err) || isBrowserStrictlyOffline();
       console.warn("SettingsView fetchData:", err?.message || err);
       if (hasHydratedLocal) {
         setUsingLocalCache({ active: true, timestamp: cachedTs });
@@ -1108,8 +1108,8 @@ const SettingsView: React.FC<SettingsViewProps> = ({ user }) => {
       return;
     }
 
-    if (typeof navigator !== 'undefined' && !navigator.onLine) {
-      toast.error("Connexion requise : l'enregistrement de l'identité de l'établissement nécessite une connexion Internet active.");
+    if (isBrowserStrictlyOffline()) {
+      toast.error("Connexion requise : l'enregistrement de l'identité de l'établissement nécessite une connexion active.");
       return;
     }
 

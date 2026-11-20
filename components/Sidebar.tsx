@@ -63,6 +63,7 @@ import Logo from './Logo';
 import { usePwaInstall } from '../hooks/usePwaInstall';
 import { useOnlineStatus } from '../hooks/useOnlineStatus';
 import { prefetchRouteChunk } from '../utils/routePrefetch';
+import { isLocalDeploymentMode } from '../supabase';
 
 import { toast } from 'sonner';
 
@@ -339,7 +340,15 @@ const Sidebar: React.FC<SidebarProps> = ({ user, onLogout }) => {
                 </div>
                 <span
                   className="absolute -bottom-0.5 -right-0.5 flex h-2.5 w-2.5"
-                  title={!isOnline ? 'Mode hors-ligne actif' : isSlow ? 'Connexion instable / lente' : 'Connecté au Cloud'}
+                  title={
+                    !isOnline
+                      ? (isLocalDeploymentMode() ? 'Serveur local injoignable' : 'Mode hors-ligne actif')
+                      : isSlow
+                        ? 'Connexion instable / lente'
+                        : isLocalDeploymentMode()
+                          ? 'Connecté au Serveur Local (LAN)'
+                          : 'Connecté au Cloud'
+                  }
                 >
                   <span
                     className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-60 ${

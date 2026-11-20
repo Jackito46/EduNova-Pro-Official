@@ -113,6 +113,19 @@ export function isLocalDeploymentMode(): boolean {
   return info.mode === 'lan' || info.mode === 'standalone' || info.lanProxyActive;
 }
 
+/**
+ * Retourne true uniquement si le navigateur signale une coupure réseau ET que
+ * l'application tourne en Mode Cloud (dépendant d'Internet).
+ * En Mode Serveur Local / LAN, le serveur Docker (localhost / IP LAN) reste
+ * joignable même lorsque le Wi-Fi / Internet est coupé : on laisse donc le
+ * vrai test HTTP décider de la joignabilité du serveur local.
+ */
+export function isBrowserStrictlyOffline(): boolean {
+  if (typeof navigator === 'undefined') return false;
+  if (navigator.onLine !== false) return false;
+  return !isLocalDeploymentMode();
+}
+
 export function setLocalBackendOverride(options: { enabled: boolean; url?: string; anonKey?: string }): void {
   if (typeof window === 'undefined') return;
   try {
@@ -287,8 +300,9 @@ export const hasStoredAuthToken = (): boolean => {
 
 // Helper to check if Supabase is reachable
 export const checkSupabaseConnection = async (): Promise<boolean> => {
-  // If the browser explicitly says we are offline, don't even try to fetch
-  if (typeof window !== 'undefined' && window.navigator.onLine === false) {
+  // En mode Cloud uniquement : si le navigateur signale hors-ligne, inutile de tenter le fetch Internet.
+  // En mode Local / LAN, on teste toujours réellement la passerelle locale (/local-supabase).
+  if (isBrowserStrictlyOffline()) {
     emitNetworkStatus({ online: false, reason: 'navigator-offline' });
     return false;
   }
@@ -566,7 +580,7 @@ let lastNetworkFailureAt = 0;
 let lastSuccessEmitAt = 0;
 
 export const isEffectivelyOffline = (): boolean => {
-  if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+  if (isBrowserStrictlyOffline()) {
     return true;
   }
   return lastNetworkFailureAt > 0 && (Date.now() - lastNetworkFailureAt) < 15000;
@@ -604,7 +618,7 @@ export const emitNetworkStatus = (detail: { online: boolean; latencyMs?: number;
 
 export const isNetworkOrTimeoutError = (err: any): boolean => {
   if (!err) return false;
-  if (typeof navigator !== 'undefined' && !navigator.onLine) return true;
+  if (isBrowserStrictlyOffline()) return true;
   const code = String(err?.code || '').toUpperCase();
   const status = Number(err?.status || err?.statusCode || 0);
   const name = String(err?.name || '');
@@ -645,9 +659,9 @@ export const withTimeout = async <T>(
   }
 };
 
-// Safe global fetch wrapper: fails fast when offline, prevents 75s+ timeout cascades, emits live network health events
+// Safe global fetch wrapper: fails fast when offline (Cloud), always allows local LAN/Docker fetches even without Internet
 const safeFetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
-  if (typeof navigator !== 'undefined' && !navigator.onLine) {
+  if (isBrowserStrictlyOffline()) {
     emitNetworkStatus({ online: false, reason: 'navigator-offline' });
     return new Response(JSON.stringify({
       message: "Erreur réseau: Mode hors-ligne actif.",
@@ -710,7 +724,7 @@ const safeFetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<
         Boolean(err?.message && err.message.toLowerCase().includes('fetch'));
 
       // Retry ONLY once on fast idempotent glitches (< 2.2s); never chain two full timeouts together
-      if (isNetworkError && attempt < maxRetries && elapsed < 2200 && (typeof navigator === 'undefined' || navigator.onLine)) {
+      if (isNetworkError && attempt < maxRetries && elapsed < 2200 && !isBrowserStrictlyOffline()) {
         await new Promise(r => setTimeout(r, 300));
         continue;
       }

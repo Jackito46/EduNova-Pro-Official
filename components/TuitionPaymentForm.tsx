@@ -47,7 +47,7 @@ import { StudentDossierAuditModal, SessionAuditDetail } from './StudentDossierAu
 import { SolvencyMemoBanner, computeSolvencyMemoVisibility } from './SolvencyMemoBanner';
 import { toast } from 'sonner';
 import { formatStudentName } from '../utils/formatters';
-import { supabase, clearNetworkFailureWindow, isEffectivelyOffline } from '../supabase';
+import { supabase, clearNetworkFailureWindow, isEffectivelyOffline, isBrowserStrictlyOffline, isLocalDeploymentMode } from '../supabase';
 import { useSchool } from '../contexts/SchoolContext';
 import { computeCertifiedStudentArrears } from '../utils/studentDebtAudit';
 import { AuditLogger } from '../utils/auditLogger';
@@ -558,7 +558,7 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
       setRefError(null);
       return;
     }
-    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+    if (isBrowserStrictlyOffline()) {
       setRefError(null);
       return;
     }
@@ -857,7 +857,7 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
       }
       setIsSearching(true);
       try {
-        if (typeof navigator !== 'undefined' && !navigator.onLine) {
+        if (isBrowserStrictlyOffline()) {
           await searchOfflineStudents();
           return;
         }
@@ -1283,7 +1283,7 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
     const currentSeq = ++loadDetailsSeqRef.current;
     setLoadingDebt(true);
     try {
-      const isOfflineNow = typeof navigator !== 'undefined' && !navigator.onLine;
+      const isOfflineNow = isBrowserStrictlyOffline();
       let dbData: any = null;
       let allEnrollmentsData: any[] | null = null;
       let pData: any[] | null = null;
@@ -1476,8 +1476,8 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
           ? Math.max(0, totalCredits - totalDebits)
           : Number(data.wallet_balance_htg || 0);
 
-        // Synchronisation directe avec l'API Tranzak pour garantir la parité instantanée avec le Dossier Élève (uniquement en ligne)
-        if (!usedOfflineFallback && (typeof navigator === 'undefined' || navigator.onLine)) {
+        // Synchronisation directe avec l'API Tranzak pour garantir la parité instantanée avec le Dossier Élève (uniquement en mode Cloud/En ligne)
+        if (!usedOfflineFallback && !isLocalDeploymentMode() && !isBrowserStrictlyOffline()) {
           try {
             const studentFullName = `${data.first_name || ''} ${data.last_name || ''}`.trim();
             const session = (await supabase.auth.getSession()).data?.session;
@@ -2675,8 +2675,8 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
         toast.success(`Reçu provisoire ${offlineRec.provisionalNumber} chiffré localement. Synchronisation automatique dès le retour d’Internet.`);
       };
 
-      // Mode hors-ligne explicite : enregistrement local chiffré immédiat sans attente réseau
-      if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      // Mode hors-ligne explicite (Cloud sans Internet) : enregistrement local chiffré immédiat sans attente réseau
+      if (isBrowserStrictlyOffline()) {
         await saveOfflineReceiptFallback();
         return;
       }

@@ -6,7 +6,7 @@
  * - Idempotence stricte sur clientTxId + détection et arbitrage des conflits de notes
  */
 
-import { supabase } from '../supabase';
+import { supabase, isBrowserStrictlyOffline } from '../supabase';
 import { AuditLogger } from '../utils/auditLogger';
 import {
   allocateProvisionalReceiptSeal,
@@ -171,7 +171,7 @@ export function subscribeOfflineSyncState(listener: SyncListener, schoolId?: str
 
 /** Détecte si une erreur Supabase est due à une coupure réseau / timeout plutôt qu'à un rejet métier */
 export function isTransientNetworkError(err: any): boolean {
-  if (typeof navigator !== 'undefined' && !navigator.onLine) return true;
+  if (isBrowserStrictlyOffline()) return true;
   if (!err) return false;
   const code = String(err?.code || '').toUpperCase();
   const status = Number(err?.status || err?.statusCode || 0);
@@ -526,7 +526,7 @@ export async function flushOfflineSyncQueue(options?: {
   forceManual?: boolean;
 }): Promise<{ synced: number; conflicts: number; remaining: number }> {
   if (flushingPromise) return flushingPromise;
-  if (typeof navigator !== 'undefined' && !navigator.onLine) {
+  if (isBrowserStrictlyOffline()) {
     const summary = await getOfflineSyncSummary(options?.schoolId);
     return { synced: 0, conflicts: summary.conflictCount, remaining: summary.pendingCount };
   }
@@ -771,7 +771,7 @@ export function initOfflineSyncAutoFlush(schoolId?: string): () => void {
     void flushOfflineSyncQueue({ schoolId });
   };
   const handleVisibility = () => {
-    if (document.visibilityState === 'visible' && navigator.onLine) {
+    if (document.visibilityState === 'visible' && !isBrowserStrictlyOffline()) {
       void flushOfflineSyncQueue({ schoolId });
     }
   };
@@ -781,7 +781,7 @@ export function initOfflineSyncAutoFlush(schoolId?: string): () => void {
 
   // Vérification périodique douce toutes les 90s si en ligne et non masqué
   const timer = window.setInterval(() => {
-    if (navigator.onLine && document.visibilityState === 'visible') {
+    if (!isBrowserStrictlyOffline() && document.visibilityState === 'visible') {
       void flushOfflineSyncQueue({ schoolId });
     }
   }, 90_000);
@@ -804,7 +804,7 @@ export async function prefetchSchoolReferenceCache(
   userId: string,
   force = false
 ): Promise<{ cachedDatasets: number; studentCount: number; classCount: number }> {
-  if (!schoolId || !userId || (typeof navigator !== 'undefined' && !navigator.onLine)) {
+  if (!schoolId || !userId || isBrowserStrictlyOffline()) {
     return { cachedDatasets: 0, studentCount: 0, classCount: 0 };
   }
 

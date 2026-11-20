@@ -7,7 +7,7 @@ import {
   Clock, Zap, Calendar, History, UserCheck, Timer
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { supabase, supabaseUrl, supabaseAnonKey, isValidUuid } from '../supabase';
+import { supabase, supabaseUrl, supabaseAnonKey, isValidUuid, isBrowserStrictlyOffline } from '../supabase';
 import { createClient } from '@supabase/supabase-js';
 import { AuditLogger } from '../utils/auditLogger';
 import { formatFullName, formatStudentName } from '../utils/formatters';
@@ -229,7 +229,7 @@ const UserManagementView: React.FC<{ currentUser: UserProfile }> = ({ currentUse
   const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isOffline, setIsOffline] = useState(!navigator.onLine);
+  const [isOffline, setIsOffline] = useState(isBrowserStrictlyOffline());
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [selectedUserModal, setSelectedUserModal] = useState<UserProfile | null>(null);
   const [activeFicheTab, setActiveFicheTab] = useState<'overview' | 'permissions'>('overview');
@@ -439,7 +439,7 @@ const UserManagementView: React.FC<{ currentUser: UserProfile }> = ({ currentUse
 
   useEffect(() => { 
     fetchUsersAndStaff(); 
-    const handleStatus = () => setIsOffline(!navigator.onLine);
+    const handleStatus = () => setIsOffline(isBrowserStrictlyOffline());
     window.addEventListener('online', handleStatus);
     window.addEventListener('offline', handleStatus);
     return () => {
@@ -450,7 +450,7 @@ const UserManagementView: React.FC<{ currentUser: UserProfile }> = ({ currentUse
 
   const handleCreateUser = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!navigator.onLine) {
+    if (isBrowserStrictlyOffline()) {
       setErrorMsg("Action impossible hors-ligne.");
       return;
     }
@@ -596,7 +596,7 @@ const UserManagementView: React.FC<{ currentUser: UserProfile }> = ({ currentUse
       return;
     }
 
-    if (!navigator.onLine) {
+    if (isBrowserStrictlyOffline()) {
       showAlert("Erreur", "Action impossible hors-ligne.");
       return;
     }
@@ -705,7 +705,7 @@ const UserManagementView: React.FC<{ currentUser: UserProfile }> = ({ currentUse
   };
 
   const handleRestoreAccess = async (targetUser: UserProfile) => {
-    if (!navigator.onLine) {
+    if (isBrowserStrictlyOffline()) {
       showAlert("Erreur", "Action impossible hors-ligne.");
       return;
     }
@@ -753,7 +753,7 @@ const UserManagementView: React.FC<{ currentUser: UserProfile }> = ({ currentUse
 
   const handleReactivateAndExtend = async () => {
     if (!reopenModal.user) return;
-    if (!navigator.onLine) {
+    if (isBrowserStrictlyOffline()) {
       showAlert("Erreur", "Action impossible hors-ligne.");
       return;
     }
@@ -967,7 +967,7 @@ const UserManagementView: React.FC<{ currentUser: UserProfile }> = ({ currentUse
   };
 
   const handleToggleStatus = (userId: string, userName: string, currentStatus: boolean) => {
-    if (!navigator.onLine) {
+    if (isBrowserStrictlyOffline()) {
       showAlert("Erreur", "Action impossible hors-ligne.");
       return;
     }
@@ -1033,7 +1033,7 @@ const UserManagementView: React.FC<{ currentUser: UserProfile }> = ({ currentUse
   };
 
   const handleDeleteUser = (userId: string, userName: string) => {
-    if (!navigator.onLine) {
+    if (isBrowserStrictlyOffline()) {
       showAlert("Erreur", "Action impossible hors-ligne.");
       return;
     }

@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 import { School, SchoolType, SchoolCampus, UserProfile, AcademicYear, UserRole } from '../types';
-import { supabase } from '../supabase';
+import { supabase, isBrowserStrictlyOffline } from '../supabase';
 import { getTerminology, Terminology } from '../lib/terminology';
 
 interface SchoolContextType {
@@ -109,7 +109,7 @@ export const SchoolProvider: React.FC<{ user: UserProfile | null, schoolId: stri
       console.warn("School cache read error:", e);
     }
 
-    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+    if (isBrowserStrictlyOffline()) {
       setLoading(false);
       return;
     }
@@ -174,7 +174,7 @@ export const SchoolProvider: React.FC<{ user: UserProfile | null, schoolId: stri
       console.warn("Campuses cache read error:", e);
     }
 
-    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+    if (isBrowserStrictlyOffline()) {
       return;
     }
 
@@ -293,7 +293,7 @@ export const SchoolProvider: React.FC<{ user: UserProfile | null, schoolId: stri
       }
     } catch {}
 
-    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+    if (isBrowserStrictlyOffline()) {
       return;
     }
 
@@ -339,7 +339,7 @@ export const SchoolProvider: React.FC<{ user: UserProfile | null, schoolId: stri
   };
 
   const fetchGlobalModules = useCallback(async () => {
-    if (typeof navigator !== 'undefined' && !navigator.onLine) return;
+    if (isBrowserStrictlyOffline()) return;
     try {
       const { data, error } = await withQuickRace(
         supabase

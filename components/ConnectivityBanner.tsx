@@ -21,6 +21,7 @@ import {
   subscribeOfflineSyncState,
 } from '../services/offlineSyncEngine';
 import { Link } from 'react-router-dom';
+import { isLocalDeploymentMode } from '../supabase';
 
 const EMPTY_SUMMARY: OfflineSyncSummary = {
   pendingCount: 0,
@@ -34,6 +35,7 @@ const EMPTY_SUMMARY: OfflineSyncSummary = {
 };
 
 const ConnectivityBanner: React.FC = () => {
+  const isLocalMode = isLocalDeploymentMode();
   const { isOnline, isSlow, latency, lastChecked, isChecking, refreshStatus } = useOnlineStatus();
   const { isLightMode, manualPref, setManualMode } = useAdaptiveLightMode();
   const [isMinimized, setIsMinimized] = useState(false);
@@ -68,7 +70,7 @@ const ConnectivityBanner: React.FC = () => {
     try {
       const res = await flushOfflineSyncQueue({ forceManual: true });
       if (res.synced > 0) {
-        toast.success(`${res.synced} opération(s) synchronisée(s) vers EduNova Cloud.`);
+        toast.success(`${res.synced} opération(s) synchronisée(s) vers ${isLocalMode ? 'le Serveur Local' : 'EduNova Cloud'}.`);
       } else if (res.conflicts > 0) {
         toast.warning(`${res.conflicts} conflit(s) de notes nécessitent votre arbitrage.`);
       } else if (res.remaining > 0) {
@@ -152,7 +154,7 @@ const ConnectivityBanner: React.FC = () => {
               {isOffline ? (
                 <>
                   <WifiOff size={13} className="text-rose-400" />
-                  <span>Hors-ligne</span>
+                  <span>{isLocalMode ? 'Serveur local coupé' : 'Hors-ligne'}</span>
                 </>
               ) : isSlow ? (
                 <>
@@ -226,7 +228,7 @@ const ConnectivityBanner: React.FC = () => {
                   <div className="flex items-center gap-1.5 flex-wrap">
                     <h4 className="text-xs sm:text-sm font-bold text-white tracking-tight truncate">
                       {isOffline
-                        ? 'Mode Local (Hors-ligne)'
+                        ? (isLocalMode ? 'Serveur Local Injoignable' : 'Mode Local (Hors-ligne)')
                         : hasConflictOrError
                           ? 'Arbitrage Requis'
                           : syncSummary.pendingCount > 0
@@ -247,7 +249,7 @@ const ConnectivityBanner: React.FC = () => {
                       }`}
                     >
                       {isOffline
-                        ? 'HORS-LIGNE'
+                        ? (isLocalMode ? 'SERVEUR COUPÉ' : 'HORS-LIGNE')
                         : isLightMode
                           ? 'MODE LÉGER'
                           : isSlow
@@ -261,7 +263,9 @@ const ConnectivityBanner: React.FC = () => {
                           syncSummary.conflictCount > 0 ? ` • ${syncSummary.conflictCount} conflit(s)` : ''
                         }`
                       : isOffline
-                        ? 'Saisie de notes & reçus chiffrés localement (AES-256)'
+                        ? (isLocalMode
+                            ? 'Relais chiffré AES-256 actif en attendant le serveur local'
+                            : 'Saisie de notes & reçus chiffrés localement (AES-256)')
                         : isSlow
                           ? 'Latence élevée • Compression & mode léger recommandés'
                           : 'Animations et requêtes allégées pour économiser la data'}

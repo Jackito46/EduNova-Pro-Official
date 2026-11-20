@@ -57,7 +57,7 @@ import {
 import { toast } from 'sonner';
 import { UserProfile, UserRole } from '../types';
 import { useSchool } from '../contexts/SchoolContext';
-import { supabase, isValidUuid, isNetworkOrTimeoutError, withTimeout } from '../supabase';
+import { supabase, isValidUuid, isNetworkOrTimeoutError, withTimeout, isBrowserStrictlyOffline } from '../supabase';
 import { geminiService } from '../services/geminiService';
 import { ConnectionRetryFallback as RetryableError } from './ConnectionRetryFallback';
 import { useOnlineStatus } from '../hooks/useOnlineStatus';
@@ -447,8 +447,8 @@ const Dashboard: React.FC<{ user: UserProfile }> = ({ user }) => {
       }
     } catch (e) {}
 
-    // Fail fast cleanly when offline so UI never freezes
-    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+    // Fail fast cleanly when offline (Cloud) so UI never freezes
+    if (isBrowserStrictlyOffline()) {
       if (hasLoadedFromCache) {
         setError(null);
         setCacheMeta({ isStale: true, updatedAt: cachedTimestamp });
@@ -1686,7 +1686,7 @@ const Dashboard: React.FC<{ user: UserProfile }> = ({ user }) => {
       setError(null);
 
     } catch (err: any) {
-      const networkIssue = isNetworkOrTimeoutError(err) || (typeof navigator !== 'undefined' && !navigator.onLine);
+      const networkIssue = isNetworkOrTimeoutError(err) || isBrowserStrictlyOffline();
 
       if (networkIssue) {
         console.warn("Dashboard Stats: Connexion instable/hors-ligne (bascule sur cache local):", err?.message || err);

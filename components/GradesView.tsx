@@ -42,7 +42,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import * as XLSX from "xlsx";
-import { supabase } from "../supabase";
+import { supabase, isBrowserStrictlyOffline } from "../supabase";
 import { useSchool } from "../contexts/SchoolContext";
 import { UserProfile, SchoolType } from "../types";
 import { AcademicSessionPill } from "./AcademicSessionPill";
@@ -388,7 +388,7 @@ const GradesView: React.FC<{ user: UserProfile }> = ({ user }) => {
     };
 
     try {
-      if (typeof navigator !== "undefined" && !navigator.onLine) {
+      if (isBrowserStrictlyOffline()) {
         await loadRefsFromOfflineVault();
         return;
       }
@@ -728,7 +728,7 @@ const GradesView: React.FC<{ user: UserProfile }> = ({ user }) => {
     };
 
     try {
-      if (typeof navigator !== "undefined" && !navigator.onLine) {
+      if (isBrowserStrictlyOffline()) {
         const ok = await loadContextFromOfflineVault();
         if (!ok) {
           toast.info("Mode hors-ligne : aucun préchargement local trouvé pour cette classe.");
@@ -1168,7 +1168,7 @@ const GradesView: React.FC<{ user: UserProfile }> = ({ user }) => {
         return;
       }
 
-      if (typeof navigator !== "undefined" && !navigator.onLine) {
+      if (isBrowserStrictlyOffline()) {
         await enqueueOfflineGradesBatch({
           schoolId: user.school_id,
           userId: user.id,

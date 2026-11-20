@@ -6,7 +6,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
-import { supabase, isValidUuid } from '../supabase';
+import { supabase, isValidUuid, isBrowserStrictlyOffline } from '../supabase';
 import { StaffMember, UserProfile, UserRole } from '../types';
 import Modal from './Modal';
 import { AuditLogger } from '../utils/auditLogger';
@@ -26,7 +26,7 @@ const StaffManagement: React.FC<{ user: UserProfile }> = ({ user }) => {
   const [showInactive, setShowInactive] = useState(false);
   const [staff, setStaff] = useState<StaffMember[]>([]);
   const [loading, setLoading] = useState(true);
-  const [isOfflineMode, setIsOfflineMode] = useState(!navigator.onLine);
+  const [isOfflineMode, setIsOfflineMode] = useState(isBrowserStrictlyOffline());
   
   const [deleteCandidate, setDeleteCandidate] = useState<StaffMember | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);

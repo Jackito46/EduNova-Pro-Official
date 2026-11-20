@@ -32,6 +32,7 @@ import { useOnlineStatus } from '../hooks/useOnlineStatus';
 import { useAdaptiveLightMode } from '../hooks/useAdaptiveLightMode';
 import {
   getDeploymentRuntimeInfo,
+  isLocalDeploymentMode,
   setLocalBackendOverride,
   testBackendEndpointConnection,
 } from '../supabase';
@@ -97,6 +98,7 @@ const EMPTY_SUMMARY: OfflineSyncSummary = {
 };
 
 export const OfflineDashboard: React.FC<OfflineDashboardProps> = ({ user }) => {
+  const isLocalMode = isLocalDeploymentMode();
   const { isOnline, isSlow, latency } = useOnlineStatus();
   const { profile, isLightMode, manualPref, setManualMode } = useAdaptiveLightMode();
 
@@ -510,8 +512,14 @@ export const OfflineDashboard: React.FC<OfflineDashboardProps> = ({ user }) => {
                       : 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30'
                 }`}
               >
-                {!isOnline ? <WifiOff size={12} /> : <Wifi size={12} />}
-                {!isOnline ? 'Mode Hors-ligne Actif' : isSlow ? `Connexion Faible (${latency || '?'}ms)` : 'Connecté au Cloud'}
+                {!isOnline ? <WifiOff size={12} /> : isLocalMode ? <Server size={12} /> : <Wifi size={12} />}
+                {!isOnline
+                  ? (isLocalMode ? 'Serveur Local Injoignable' : 'Mode Hors-ligne Actif')
+                  : isSlow
+                    ? `Connexion Faible (${latency || '?'}ms)`
+                    : isLocalMode
+                      ? 'Connecté au Serveur Local (LAN)'
+                      : 'Connecté au Cloud'}
               </span>
 
               <span
@@ -527,11 +535,14 @@ export const OfflineDashboard: React.FC<OfflineDashboardProps> = ({ user }) => {
             </div>
 
             <h1 className="text-xl sm:text-2xl font-bold tracking-tight">
-              Centre Hors-ligne &amp; Synchronisation Chiffrée
+              {isLocalMode
+                ? 'Serveur Local (LAN) & Coffre Chiffré'
+                : 'Centre Hors-ligne & Synchronisation Chiffrée'}
             </h1>
             <p className="text-slate-400 text-xs sm:text-sm max-w-2xl leading-relaxed">
-              Vos reçus de caisse et saisies de notes restent opérationnels sans électricité ni Internet grâce au coffre
-              IndexedDB chiffré (AES-256-GCM) et au chaînage cryptographique SHA-256.
+              {isLocalMode
+                ? 'Votre établissement fonctionne directement sur son Serveur Local Docker sans Internet. Le coffre IndexedDB chiffré (AES-256-GCM) sert de relais de sécurité en cas d’interruption temporaire du réseau local.'
+                : 'Vos reçus de caisse et saisies de notes restent opérationnels sans électricité ni Internet grâce au coffre IndexedDB chiffré (AES-256-GCM) et au chaînage cryptographique SHA-256.'}
             </p>
           </div>
 
@@ -870,11 +881,20 @@ export const OfflineDashboard: React.FC<OfflineDashboardProps> = ({ user }) => {
 
           {/* Formulaire de bascule d'un poste client vers un Serveur Local LAN */}
           <form onSubmit={handleApplyLanOverride} className="p-3.5 rounded-xl bg-slate-50 border border-slate-200/80 space-y-2.5">
-            <div className="text-xs font-bold text-slate-800">
-              Pointer ce poste vers un Serveur Local d&apos;Établissement
+            <div className="flex items-center justify-between gap-2 flex-wrap">
+              <div className="text-xs font-bold text-slate-800">
+                Pointer ce poste vers un Serveur Local d&apos;Établissement
+              </div>
+              {lanStatus?.lanProxyActive && !runtimeInfo.hasCustomOverride && (
+                <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 shrink-0">
+                  Déjà actif sur ce serveur
+                </span>
+              )}
             </div>
             <p className="text-[11px] text-slate-500 leading-snug">
-              Utile si vous ouvrez ce client depuis une autre adresse et souhaitez le relier au serveur Docker local de l&apos;école sans Internet.
+              {lanStatus?.lanProxyActive && !runtimeInfo.hasCustomOverride
+                ? 'Ce navigateur est déjà relié automatiquement au serveur local ci-contre (aucune saisie requise ici). Utilisez ce formulaire uniquement pour pointer vers un autre serveur LAN.'
+                : 'Utile si vous ouvrez ce client depuis une autre adresse et souhaitez le relier au serveur Docker local de l’école sans Internet.'}
             </p>
 
             <input
@@ -950,9 +970,15 @@ export const OfflineDashboard: React.FC<OfflineDashboardProps> = ({ user }) => {
         {envelopes.length === 0 ? (
           <div className="text-center py-7 border border-dashed border-slate-200 rounded-xl bg-slate-50/50">
             <CheckCircle2 size={24} className="text-emerald-500 mx-auto mb-2" />
-            <p className="text-xs font-semibold text-slate-700">Toutes les opérations hors-ligne sont synchronisées.</p>
+            <p className="text-xs font-semibold text-slate-700">
+              {isLocalMode
+                ? 'Aucune opération en attente dans le coffre de secours.'
+                : 'Toutes les opérations hors-ligne sont synchronisées.'}
+            </p>
             <p className="text-[11px] text-slate-500 mt-0.5">
-              Lors d&apos;une coupure Internet, vos reçus et notes apparaîtront ici automatiquement.
+              {isLocalMode
+                ? 'Vos transactions sont enregistrées directement sur votre Serveur Local Docker. En cas d’interruption du réseau local, elles apparaîtront ici automatiquement.'
+                : 'Lors d’une coupure Internet, vos reçus et notes apparaîtront ici automatiquement.'}
             </p>
           </div>
         ) : (

@@ -1,9 +1,9 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { checkSupabaseConnection } from '../supabase';
+import { checkSupabaseConnection, isBrowserStrictlyOffline, isLocalDeploymentMode } from '../supabase';
 
 export const useOnlineStatus = () => {
   const [isOnline, setIsOnline] = useState(
-    typeof navigator !== 'undefined' ? navigator.onLine : true
+    isLocalDeploymentMode() ? true : (typeof navigator !== 'undefined' ? navigator.onLine : true)
   );
   const [isSlow, setIsSlow] = useState(false);
   const [latency, setLatency] = useState<number | null>(null);
@@ -14,7 +14,9 @@ export const useOnlineStatus = () => {
 
   const checkActualConnection = useCallback(async () => {
     if (inFlightRef.current) return;
-    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+    // En mode Cloud uniquement, un navigateur hors-ligne signifie aucune connexion.
+    // En mode Local / LAN, on ping toujours réellement le serveur Docker local (/local-supabase).
+    if (isBrowserStrictlyOffline()) {
       setIsOnline(false);
       setIsSlow(false);
       setLatency(null);
@@ -58,6 +60,12 @@ export const useOnlineStatus = () => {
       void checkActualConnection();
     };
     const handleOffline = () => {
+      // En Mode Serveur Local / LAN, couper le Wi-Fi / Internet ne coupe pas localhost ni le LAN :
+      // on vérifie réellement la joignabilité du serveur local au lieu de basculer en alerte Hors-ligne.
+      if (isLocalDeploymentMode()) {
+        void checkActualConnection();
+        return;
+      }
       setIsOnline(false);
       setIsSlow(false);
       setLatency(null);
