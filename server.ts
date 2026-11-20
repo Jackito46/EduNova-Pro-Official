@@ -226,17 +226,34 @@ async function startServer() {
   // =========================================================================
   function getDetectedLanUrls(listenPort: number): string[] {
     const urls: string[] = [];
-    try {
-      const nets = os.networkInterfaces();
-      for (const entries of Object.values(nets)) {
-        if (!entries) continue;
-        for (const iface of entries) {
-          if (iface.family === 'IPv4' && !iface.internal) {
-            urls.push(`http://${iface.address}:${listenPort}`);
+    const configuredAppUrl = (process.env.APP_URL || '').trim().replace(/\/$/, '');
+    let hasConfiguredLanHost = false;
+    if (configuredAppUrl) {
+      try {
+        const parsed = new URL(configuredAppUrl);
+        if (
+          parsed.hostname !== 'localhost' &&
+          parsed.hostname !== '127.0.0.1' &&
+          !parsed.hostname.endsWith('.local')
+        ) {
+          urls.push(parsed.origin);
+          hasConfiguredLanHost = true;
+        }
+      } catch {}
+    }
+    if (!hasConfiguredLanHost) {
+      try {
+        const nets = os.networkInterfaces();
+        for (const entries of Object.values(nets)) {
+          if (!entries) continue;
+          for (const iface of entries) {
+            if (iface.family === 'IPv4' && !iface.internal) {
+              urls.push(`http://${iface.address}:${listenPort}`);
+            }
           }
         }
-      }
-    } catch {}
+      } catch {}
+    }
     return Array.from(new Set(urls));
   }
 

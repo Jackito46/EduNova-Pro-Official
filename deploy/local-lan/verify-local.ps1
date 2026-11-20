@@ -69,15 +69,16 @@ Write-Host "[5/5] Inspection PostgreSQL local ($ContainerName) :" -ForegroundCol
 $pgReady = docker exec $ContainerName pg_isready -U postgres 2>&1
 if ($LASTEXITCODE -eq 0) {
   Write-Host "      PostgreSQL pret : $pgReady" -ForegroundColor Green
-  $tablesCount = (docker exec $ContainerName psql -U postgres -d postgres -tAc "SELECT count(*) FROM information_schema.tables WHERE table_schema = 'public' AND table_type = 'BASE TABLE';").Trim()
-  $usersCount = (docker exec $ContainerName psql -U postgres -d postgres -tAc "SELECT count(*) FROM auth.users;").Trim()
-  $schoolsCount = (docker exec $ContainerName psql -U postgres -d postgres -tAc "SELECT CASE WHEN to_regclass('public.schools') IS NULL THEN -1 ELSE (SELECT count(*) FROM public.schools) END;").Trim()
+  $tablesCount = ((docker exec $ContainerName psql -U postgres -d postgres -tAc "SELECT count(*) FROM information_schema.tables WHERE table_schema = 'public' AND table_type = 'BASE TABLE';") | Out-String).Trim()
+  $usersCount = ((docker exec $ContainerName psql -U postgres -d postgres -tAc "SELECT count(*) FROM auth.users;") | Out-String).Trim()
+  $hasSchools = ((docker exec $ContainerName psql -U postgres -d postgres -tAc "SELECT COALESCE(to_regclass('public.schools')::text, '');") | Out-String).Trim()
   Write-Host "      Tables dans public : $tablesCount" -ForegroundColor White
   Write-Host "      Comptes auth.users : $usersCount" -ForegroundColor White
-  if ($schoolsCount -eq "-1") {
-    Write-Host "      [INFO] La table 'public.schools' n'existe pas encore : base vierge." -ForegroundColor Yellow
+  if (-not $hasSchools) {
+    Write-Host "      [INFO] La table 'public.schools' n'existe pas encore : base vierge (normal avant l'import)." -ForegroundColor Yellow
     Write-Host "             Importez votre base Cloud : powershell -ExecutionPolicy Bypass -File .\deploy\local-lan\import-cloud-to-local.ps1" -ForegroundColor Cyan
   } else {
+    $schoolsCount = ((docker exec $ContainerName psql -U postgres -d postgres -tAc "SELECT count(*) FROM public.schools;") | Out-String).Trim()
     Write-Host "      Ecoles (schools)   : $schoolsCount" -ForegroundColor Green
   }
 } else {
